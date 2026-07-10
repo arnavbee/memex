@@ -1,0 +1,25 @@
+{
+  "name": "omnicontext",
+  "version": "1.0.0",
+  "description": "Local personal AI context database and MCP server",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsc -w"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^0.6.0",
+    "@mozilla/readability": "^0.6.0",
+    "@types/jsdom": "^28.0.3",
+    "chokidar": "^3.6.0",
+    "dotenv": "^16.4.5",
+    "jsdom": "^29.1.1",
+    "react-tweet": "^3.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.24",
+    "typescript": "^5.3.3"
+  }
+}

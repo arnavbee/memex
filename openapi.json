@@ -1,0 +1,225 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "OmniContext Personal Vault API",
+    "description": "API for searching and retrieving personal digital context from screenshots, clipboard logs, Apple Notes, and webpage archives indexed locally on the user's Mac.",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://your-vault.ngrok-free.app",
+      "description": "Exposed ngrok tunnel URL mapping to localhost:4322"
+    }
+  ],
+  "paths": {
+    "/ingest": {
+      "post": {
+        "summary": "Save a link, text clipping, or tool description to the vault",
+        "description": "Ingests a new text clipping or link into the local database, automatically triggering parsing pipelines (e.g. YouTube or Twitter parsing if the input is a URL).",
+        "operationId": "ingestAsset",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "content": {
+                    "type": "string",
+                    "description": "The URL, text, caption, or tool description to save."
+                  }
+                },
+                "required": ["content"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Asset successfully saved to vault",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": { "type": "boolean" },
+                    "message": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/search": {
+      "post": {
+        "summary": "Search the user's personal vault for screenshots, notes, clips, or URLs",
+        "description": "Performs TF-IDF semantic and keyword search on local database assets, matching queries directly to article text, OCR text, and visual descriptions.",
+        "operationId": "searchVault",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "query": {
+                    "type": "string",
+                    "description": "Search keyword or semantic query string (e.g. 'sologrants', 'slate blue t-shirt')."
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "default": 5,
+                    "description": "Maximum number of search results to return."
+                  }
+                },
+                "required": ["query"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Search results successfully retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": { "type": "boolean" },
+                    "results": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "score": { "type": "number" },
+                          "asset": {
+                            "type": "object",
+                            "properties": {
+                              "id": { "type": "string" },
+                              "type": { "type": "string", "enum": ["screenshot", "note", "clipboard", "download"] },
+                              "content": { "type": "string" },
+                              "summary": { "type": "string" },
+                              "metadata": {
+                                "type": "object",
+                                "properties": {
+                                  "title": { "type": "string" },
+                                  "createdAt": { "type": "string" },
+                                  "sourceUrl": { "type": "string" }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized. Bearer token missing or invalid."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/recent": {
+      "get": {
+        "summary": "Get recent vault items",
+        "description": "Retrieves the most recently indexed items from the local database, sorted by insertion time.",
+        "operationId": "getRecentAssets",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 10
+            },
+            "description": "Number of assets to retrieve."
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "all",
+              "enum": ["all", "screenshot", "note", "clipboard", "download"]
+            },
+            "description": "Filter by asset type."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Assets successfully retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": { "type": "boolean" },
+                    "assets": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": { "type": "string" },
+                          "type": { "type": "string" },
+                          "content": { "type": "string" },
+                          "summary": { "type": "string" },
+                          "metadata": {
+                            "type": "object",
+                            "properties": {
+                              "title": { "type": "string" },
+                              "createdAt": { "type": "string" },
+                              "sourceUrl": { "type": "string" }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {},
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Enter the custom OMNICONTEXT_API_KEY Bearer token."
+      }
+    }
+  }
+}
