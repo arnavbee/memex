@@ -20,6 +20,8 @@ Memex fixes that. It's a background daemon that runs on your Mac and passively i
 - **Browser history** — Safari, Chrome, Arc, Brave, and Edge visits (all profiles), synced every 30 minutes with search/auth/localhost noise filtered out
 - **Links from your phone** — shared directly from Android via HTTP Shortcuts → POST to local API
 
+**Secrets never enter the vault.** Copies from password managers (1Password, Bitwarden, KeePass, …) are skipped via app detection and the `org.nspasteboard.ConcealedType` marker, and secret-shaped content — AWS keys, GitHub/Slack/Stripe tokens, JWTs, private key blocks, `PASSWORD=` assignments, generated-password-shaped strings — is filtered before storage.
+
 Clipboard noise is self-cleaning: exact duplicates are collapsed and raw clipboard entries expire after 30 days (configurable via `OMNICONTEXT_CLIPBOARD_MAX_AGE_DAYS` / `OMNICONTEXT_CLIPBOARD_MAX_COUNT`). Rich assets — notes, downloads, screenshots, history — are never pruned.
 
 ---
