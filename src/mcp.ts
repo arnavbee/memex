@@ -11,6 +11,7 @@ import os from 'os';
 import { Database } from './db.js';
 import { syncNotes } from './notes.js';
 import { scanRecentFiles } from './historical.js';
+import { syncBrowserHistory } from './browser.js';
 
 function compressImage(filePath: string): Promise<string> {
   return new Promise((resolve) => {
@@ -58,6 +59,24 @@ export function startMcpServer(db: Database) {
       capabilities: {
         tools: {},
       },
+      instructions: `You have access to the user's personal memory vault via the omnicontext tools.
+
+ALWAYS use these tools proactively — do NOT answer from memory alone:
+- Call get_recent_assets whenever the user asks about something they recently saved, copied, downloaded, screenshotted, or noted.
+- Call search_vault whenever the user asks about a specific topic, link, tweet, video, or note they may have saved.
+
+Trigger these tools automatically for any question about:
+- "last link / link I saved"
+- "that tweet / article / video"
+- "my notes on X"
+- "what did I copy / save / download"
+- "recently" or "last week" or "earlier"
+
+Never say "I don't have that information" without first checking the vault.
+
+After a search, use get_asset_by_id to pull the complete content of a specific result.
+If the user asks about a page they visited in the last half hour and it's missing, call sync_browser_history first, then search again.
+When the user asks to forget/delete/remove a saved item, find it first, then call delete_asset with its ID.`,
     }
   );
 
@@ -81,7 +100,7 @@ export function startMcpServer(db: Database) {
               },
               type: {
                 type: 'string',
-                enum: ['all', 'screenshot', 'download', 'note', 'clipboard'],
+                enum: ['all', 'screenshot', 'download', 'note', 'clipboard', 'history'],
                 description: 'Filter search results by type. Use "download" to search tweets, YouTube videos, and web links. Default is "all".'
               }
             },
@@ -100,10 +119,46 @@ export function startMcpServer(db: Database) {
               },
               type: {
                 type: 'string',
-                enum: ['all', 'screenshot', 'download', 'note', 'clipboard'],
+                enum: ['all', 'screenshot', 'download', 'note', 'clipboard', 'history'],
                 description: 'Filter items by type. Use "download" to find tweets and web links without clipboard noise. Default is "all".'
               }
             }
+          }
+        },
+        {
+          name: 'get_asset_by_id',
+          description: 'Fetch the full, untruncated content of a single vault item by its ID. Use this after search_vault or get_recent_assets when you need the complete content of one result.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              id: {
+                type: 'string',
+                description: 'The asset ID as shown in search or recent results.'
+              }
+            },
+            required: ['id']
+          }
+        },
+        {
+          name: 'delete_asset',
+          description: 'Permanently remove an item from the vault by its ID. Use when the user asks to forget, delete, or remove a saved item (e.g. "forget that note", "delete that clipboard entry").',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              id: {
+                type: 'string',
+                description: 'The asset ID to delete, as shown in search or recent results.'
+              }
+            },
+            required: ['id']
+          }
+        },
+        {
+          name: 'sync_browser_history',
+          description: 'Force an immediate sync of browser history (Safari, Chrome, Arc, Brave, Edge). The background daemon only syncs every 30 minutes, so call this first when the user asks about a page, article, or site they visited very recently and it is missing from search results.',
+          inputSchema: {
+            type: 'object',
+            properties: {}
           }
         },
         {
@@ -258,6 +313,63 @@ export function startMcpServer(db: Database) {
         return { content };
       }
 
+      if (name === 'get_asset_by_id') {
+        const id = String(args?.id || '');
+        const asset = db.getById(id);
+        if (!asset) {
+          return { content: [{ type: 'text', text: `No asset found with ID "${id}".` }] };
+        }
+
+        const content: any[] = [];
+        const fileInfo = asset.filePath ? `\nFile Path: ${asset.filePath}` : '';
+        const titleInfo = asset.metadata.title ? `\nTitle: ${asset.metadata.title}` : '';
+        const urlInfo = asset.metadata.sourceUrl ? `\nSource URL: ${asset.metadata.sourceUrl}` : '';
+        content.push({
+          type: 'text',
+          text: `[ID: ${asset.id}] [Type: ${asset.type}]${titleInfo}${urlInfo}${fileInfo}\nDate: ${asset.metadata.createdAt}\nContent:\n${asset.content}`
+        });
+
+        const paths = [];
+        if (asset.filePath) paths.push(asset.filePath);
+        if (asset.metadata?.localMediaPaths) paths.push(...asset.metadata.localMediaPaths);
+        for (const mediaPath of paths.slice(0, 3)) {
+          if (fs.existsSync(mediaPath) && ['.png', '.jpg', '.jpeg', '.webp'].includes(path.extname(mediaPath).toLowerCase())) {
+            const base64Data = await compressImage(mediaPath);
+            if (base64Data) {
+              content.push({ type: 'image', data: base64Data, mimeType: 'image/jpeg' });
+            }
+          }
+        }
+
+        return { content };
+      }
+
+      if (name === 'delete_asset') {
+        const id = String(args?.id || '');
+        const asset = db.getById(id);
+        if (!asset) {
+          return { content: [{ type: 'text', text: `No asset found with ID "${id}". Nothing deleted.` }] };
+        }
+        db.deleteAsset(id);
+        const label = asset.metadata.title || asset.content.substring(0, 60);
+        return {
+          content: [{ type: 'text', text: `Deleted ${asset.type} "${label}" (ID: ${id}) from the vault.` }]
+        };
+      }
+
+      if (name === 'sync_browser_history') {
+        console.error('Manual browser history sync triggered via MCP tool...');
+        const indexed = await syncBrowserHistory(db, 24);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Browser history sync completed: ${indexed} pages from the last 24 hours are now indexed.`
+            }
+          ]
+        };
+      }
+
       if (name === 'sync_notes_now') {
         console.error('Manual notes sync triggered via MCP tool...');
         await syncNotes(db);
@@ -272,7 +384,13 @@ export function startMcpServer(db: Database) {
       }
 
       if (name === 'sync_recent_files') {
-        const type = args?.type as 'screenshot' | 'download';
+        const type = args?.type;
+        if (type !== 'screenshot' && type !== 'download') {
+          return {
+            content: [{ type: 'text', text: `Invalid type "${type}". Must be "screenshot" or "download".` }],
+            isError: true
+          };
+        }
         const limit = Number(args?.limit || 10);
         console.error(`Manual historical scan triggered for ${type}s (limit: ${limit})...`);
         const resultMessage = await scanRecentFiles(db, type, limit);

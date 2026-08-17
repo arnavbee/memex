@@ -1,4 +1,5 @@
 import { createServer, IncomingMessage, ServerResponse } from 'http';
+import { timingSafeEqual } from 'crypto';
 import { Database } from './db.js';
 import { processYoutubeLink, extractVideoId } from './youtube.js';
 import { processTwitterLink, extractTweetId } from './twitter.js';
@@ -17,39 +18,52 @@ function getLocalIp(): string {
   return '127.0.0.1';
 }
 
+const MAX_BODY_BYTES = 1024 * 1024; // 1MB — this endpoint is exposed via a public tunnel
+
 function readBody(req: IncomingMessage): Promise<string> {
   return new Promise((resolve, reject) => {
-    let body = '';
-    req.on('data', chunk => { body += chunk.toString(); });
-    req.on('end', () => resolve(body));
+    let size = 0;
+    const chunks: Buffer[] = [];
+    let rejected = false;
+    req.on('data', chunk => {
+      if (rejected) return;
+      size += chunk.length;
+      if (size > MAX_BODY_BYTES) {
+        // Stop buffering but keep the socket alive so the caller can still
+        // answer with a 413 instead of an abrupt connection reset.
+        rejected = true;
+        chunks.length = 0;
+        req.pause();
+        reject(new Error('Request body too large (max 1MB)'));
+        return;
+      }
+      chunks.push(chunk);
+    });
+    req.on('end', () => resolve(Buffer.concat(chunks).toString('utf-8')));
     req.on('error', reject);
   });
 }
 
+function isAuthorized(authHeader: string, apiKey: string): boolean {
+  const expected = Buffer.from(`Bearer ${apiKey}`);
+  const provided = Buffer.from(authHeader);
+  // timingSafeEqual requires equal lengths; length comparison leaks only the
+  // key's length, not its contents.
+  if (expected.length !== provided.length) return false;
+  return timingSafeEqual(expected, provided);
+}
+
+// No CORS headers on purpose: the clients (ChatGPT Actions, HTTP Shortcuts,
+// curl) are not browsers, and a wildcard origin would let any webpage the
+// user visits probe the tunnel.
 function sendJson(res: ServerResponse, status: number, data: object) {
   const json = JSON.stringify(data);
-  res.writeHead(status, {
-    'Content-Type': 'application/json',
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-  });
+  res.writeHead(status, { 'Content-Type': 'application/json' });
   res.end(json);
 }
 
 export function startIngestServer(db: Database, port = 4322) {
   const server = createServer(async (req, res) => {
-    // CORS preflight
-    if (req.method === 'OPTIONS') {
-      res.writeHead(204, {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization'
-      });
-      res.end();
-      return;
-    }
-
     const urlObj = new URL(req.url || '', `http://localhost:${port}`);
     const pathname = urlObj.pathname;
 
@@ -62,8 +76,8 @@ export function startIngestServer(db: Database, port = 4322) {
         return;
       }
 
-      const authHeader = req.headers['authorization'] || '';
-      if (authHeader !== `Bearer ${apiKey}`) {
+      const authHeader = String(req.headers['authorization'] || '');
+      if (!isAuthorized(authHeader, apiKey)) {
         console.error('[Ingest] Authorization failed: Invalid or missing token.');
         sendJson(res, 401, { ok: false, error: 'Unauthorized. Invalid API Key.' });
         return;
@@ -131,7 +145,7 @@ export function startIngestServer(db: Database, port = 4322) {
         sendJson(res, 200, { ok: true, message });
       } catch (err: any) {
         console.error('[Ingest] Error:', err.message);
-        sendJson(res, 500, { ok: false, error: err.message });
+        sendJson(res, err.message.includes('too large') ? 413 : 500, { ok: false, error: err.message });
       }
     } else if (req.method === 'POST' && pathname === '/search') {
       try {
@@ -174,7 +188,7 @@ export function startIngestServer(db: Database, port = 4322) {
         sendJson(res, 200, { ok: true, results: sanitizedResults });
       } catch (err: any) {
         console.error('[Ingest] Search Error:', err.message);
-        sendJson(res, 500, { ok: false, error: err.message });
+        sendJson(res, err.message.includes('too large') ? 413 : 500, { ok: false, error: err.message });
       }
     } else if (req.method === 'GET' && pathname === '/recent') {
       try {
