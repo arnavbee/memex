@@ -54,6 +54,8 @@ Two interfaces serve the database simultaneously:
 
 ## Setup
 
+**Requirements:** macOS (capture is macOS-native: Vision OCR, AppleScript, launchd) and **Node.js ≥ 22.5** (Memex uses the built-in `node:sqlite`; on older Node it exits with a clear message).
+
 ```bash
 git clone https://github.com/arnavbee/memex
 cd memex
@@ -74,21 +76,41 @@ npm run uninstall-daemon  # stop + remove (database untouched)
 cloudflared tunnel --url localhost:4322
 ```
 
-For Safari history and Apple Notes capture, grant Full Disk Access to the `node` binary (System Settings → Privacy & Security). Chromium browsers work without it.
+**Permissions** (System Settings → Privacy & Security): grant the `node` binary **Full Disk Access** for Safari history, and **Automation → Notes** for Apple Notes sync. Chromium browsers (Chrome, Brave, Arc, Edge) work without any of this.
 
-**Claude Desktop** — add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
+**Claude Desktop** — add to `~/Library/Application Support/Claude/claude_desktop_config.json`, then restart Claude Desktop:
 ```json
 {
   "mcpServers": {
     "memex": {
       "command": "node",
-      "args": ["/path/to/memex/dist/index.js"]
+      "args": ["/path/to/memex/dist/mcp-standalone.js"]
     }
   }
 }
 ```
 
-**ChatGPT Custom Actions** — import `openapi.json` from the repo into your GPT's action schema, pointing the server URL at your Cloudflare tunnel.
+> Use `mcp-standalone.js`, not `index.js` — Claude Desktop only needs the query interface. `index.js` is the full capture daemon; running it twice double-captures your clipboard and fights over port 4322. The same config works for Cursor and any MCP client.
+
+**ChatGPT Custom Actions** — import `openapi.json` from the repo into your GPT's action schema, pointing the server URL at your Cloudflare tunnel, with `Authorization: Bearer <your OMNICONTEXT_API_KEY>`.
+
+**Android share sheet** — in [HTTP Shortcuts](https://http-shortcuts.rmy.ch/), create a POST to `https://<your-tunnel>/ingest` with that same bearer header and the shared text as the body, and add it to the share menu. Anything you share from your phone lands in the vault.
+
+---
+
+## Using it
+
+There are no commands to learn. Once the daemon is running, just live your digital life — copy links, take screenshots, download PDFs — then ask your AI about it later, in plain language:
+
+- *"What was that article about attention I read last week?"*
+- *"Find the PDF I downloaded about Python interviews"*
+- *"What did I copy this morning?"*
+- *"Did that Karpathy video cover fine-tuning?"* (YouTube links auto-index their transcripts)
+- *"Delete that clipboard entry with my address in it"*
+
+Claude discovers these tools over MCP and calls them on its own: `search_vault`, `get_recent_assets`, `get_asset_by_id`, `delete_asset`, `sync_browser_history`, `sync_notes_now`, `sync_recent_files`. The one habit that makes the vault valuable: when you see something you'll want later, **copy it** — that's the entire filing system.
+
+Verify it's working: `npm test` runs the suite; `tail -f ~/.omnicontext/daemon.log` shows captures as they happen; and asking Claude *"what did I just copy?"* right after copying something is the end-to-end check.
 
 ---
 
