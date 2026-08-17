@@ -17,7 +17,10 @@ Memex fixes that. It's a background daemon that runs on your Mac and passively i
 - **Clipboard** — monitored continuously; YouTube URLs auto-fetch transcripts, Twitter links scrape post content
 - **Downloads** — PDFs, markdown files, CSVs parsed and indexed on arrival
 - **Apple Notes** — synced periodically via AppleScript
+- **Browser history** — Safari, Chrome, Arc, Brave, and Edge visits (all profiles), synced every 30 minutes with search/auth/localhost noise filtered out
 - **Links from your phone** — shared directly from Android via HTTP Shortcuts → POST to local API
+
+Clipboard noise is self-cleaning: exact duplicates are collapsed and raw clipboard entries expire after 30 days (configurable via `OMNICONTEXT_CLIPBOARD_MAX_AGE_DAYS` / `OMNICONTEXT_CLIPBOARD_MAX_COUNT`). Rich assets — notes, downloads, screenshots, history — are never pruned.
 
 ---
 
@@ -28,7 +31,7 @@ Memex fixes that. It's a background daemon that runs on your Mac and passively i
               ↓
      Memex Daemon (Node.js)
               ↓
-     Local JSON index (db.json)
+     SQLite + FTS5 (db.sqlite)
        ↙              ↘
  MCP Server          HTTP Server :4322
  (stdio)             (Bearer auth)
@@ -39,7 +42,7 @@ Claude Desktop      Cloudflare Tunnel
                    Android Share Sheet
 ```
 
-The database is a flat JSON file written atomically to disk. Search runs through a custom TF-IDF model — no embeddings, no API calls, fully offline. It weights keyword relevance, recency, document type, and URL path matches to return the most relevant result for any query.
+The database is SQLite (via Node's built-in `node:sqlite` — no native dependencies) with an FTS5 full-text index. Search is BM25 ranking over content, title, summary, and source URL, with multiplicative recency and document-type boosts — no embeddings, no API calls, fully offline. WAL mode makes concurrent access from the daemon and MCP processes safe. An existing `db.json` from older versions is migrated automatically on first start.
 
 Two interfaces serve the database simultaneously:
 - A **local MCP server** (stdio transport) for Claude Desktop and MCP-compatible editors like Cursor
@@ -58,12 +61,18 @@ npm install && npm run build
 cp .env.example .env
 # Edit .env and set API_KEY=your-secret-token
 
-# Start the daemon
+# Start the daemon once (foreground)
 npm start
+
+# ...or install it as a launchd agent: starts at login, restarts on crash
+npm run install-daemon    # logs land in ~/.omnicontext/daemon.log
+npm run uninstall-daemon  # stop + remove (database untouched)
 
 # Expose to mobile (optional)
 cloudflared tunnel --url localhost:4322
 ```
+
+For Safari history and Apple Notes capture, grant Full Disk Access to the `node` binary (System Settings → Privacy & Security). Chromium browsers work without it.
 
 **Claude Desktop** — add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 ```json
@@ -95,8 +104,8 @@ cloudflared tunnel --url localhost:4322
 
 ## Why certain things were built the way they are
 
-**Flat JSON over SQLite** — the dataset is small and mostly read-heavy. Atomic file swaps give crash safety without adding a DB engine. The file is also human-readable and trivially portable.
+**SQLite over flat JSON** — v1 used an atomically-swapped `db.json`, which was fine until two processes (daemon + MCP server) raced on read-modify-write, and every search re-parsed the whole file. Node's built-in `node:sqlite` ships FTS5 and WAL, so the fix added zero dependencies. Old `db.json` files migrate automatically.
 
-**TF-IDF over embeddings** — embeddings need either a local GPU or an API round-trip. Both break the offline-first constraint. TF-IDF runs in microseconds and works well for personal context retrieval where queries tend to be specific.
+**BM25 over embeddings** — embeddings need either a local GPU or an API round-trip. Both break the offline-first constraint. FTS5's BM25 runs in milliseconds and works well for personal context retrieval where queries tend to be specific.
 
 **Cloudflare Tunnel over ngrok** — no signup, no account, no bandwidth limits, and the URL persists for the session. Free ngrok rotates URLs on restart and throttles connections.

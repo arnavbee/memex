@@ -7,6 +7,7 @@ import { startMcpServer } from './mcp.js';
 import { startIngestServer } from './ingest.js';
 import { scanRecentFiles } from './historical.js';
 import { processWebpageUrl } from './webpage.js';
+import { syncBrowserHistory } from './browser.js';
 
 dotenv.config();
 
@@ -73,6 +74,26 @@ async function main() {
 
   // 9. Retroactively archive raw clipboard links (non-blocking)
   retroactiveUrlArchive(db).catch(err => console.error('Retroactive URL archiver failed:', err));
+
+  // 10. Sync browser history (Safari/Chrome/Arc/Brave/Edge) now and every 30 minutes
+  syncBrowserHistory(db).catch(err => console.error('Browser history sync failed:', err));
+  setInterval(() => {
+    syncBrowserHistory(db).catch(err => console.error('Browser history sync failed:', err));
+  }, THIRTY_MINUTES);
+
+  // 11. Prune clipboard noise (duplicates, stale entries) at startup and daily
+  const maxAgeDays = Number(process.env.OMNICONTEXT_CLIPBOARD_MAX_AGE_DAYS) || 30;
+  const maxCount = Number(process.env.OMNICONTEXT_CLIPBOARD_MAX_COUNT) || 2000;
+  const runPrune = () => {
+    try {
+      const removed = db.pruneClipboard(maxAgeDays, maxCount);
+      if (removed > 0) console.error(`Clipboard prune: removed ${removed} stale/duplicate items.`);
+    } catch (err) {
+      console.error('Clipboard prune failed:', err);
+    }
+  };
+  runPrune();
+  setInterval(runPrune, 24 * 60 * 60 * 1000);
 
   console.error('OmniContext background daemon initialized successfully.');
 }

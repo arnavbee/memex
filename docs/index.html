@@ -1,0 +1,788 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Memex — Your AI finally knows what you know</title>
+<link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="50" fill="%230a0a0a"/><circle cx="50" cy="50" r="44" fill="none" stroke="rgba(255,255,255,.28)" stroke-width="4"/><circle cx="50" cy="50" r="33" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="4.5"/><circle cx="50" cy="50" r="21" fill="white"/><circle cx="43.5" cy="47.5" r="4.4" fill="%230a0a0a"/><circle cx="56.5" cy="47.5" r="4.4" fill="%230a0a0a"/></svg>'>
+<meta name="description" content="A private memory engine for your Mac. Memex remembers what you read, copy, and save — and hands that context to any AI. No cloud. No subscription.">
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --card: #161616;
+    --card-2: #1d1d1d;
+    --line: rgba(255,255,255,.08);
+    --text: #f5f5f5;
+    --muted: #a3a3a3;
+    --faint: #737373;
+    --radius: 28px;
+    --accent: #f5f5f5;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.5;
+    overflow-x: hidden;
+  }
+  a { color: inherit; text-decoration: none; }
+  ::selection { background: rgba(255,255,255,.2); }
+
+  .wrap { max-width: 1160px; margin: 0 auto; padding: 0 24px; }
+
+  /* ---------- Nav ---------- */
+  nav {
+    position: sticky; top: 0; z-index: 50;
+    background: rgba(10,10,10,.72);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-bottom: 1px solid transparent;
+  }
+  nav.scrolled { border-bottom-color: var(--line); }
+  .nav-inner {
+    display: flex; align-items: center; justify-content: space-between;
+    height: 64px; gap: 24px;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 17px; letter-spacing: -.01em; }
+  .brand svg { display: block; }
+  .nav-links { display: flex; gap: 6px; }
+  .nav-links a {
+    font-size: 14px; color: var(--muted); padding: 8px 14px; border-radius: 999px;
+    transition: color .15s ease, background .15s ease;
+  }
+  .nav-links a:hover { color: var(--text); background: rgba(255,255,255,.06); }
+  .nav-cta { display: flex; gap: 10px; align-items: center; }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    font-size: 14px; font-weight: 500; border-radius: 999px; cursor: pointer;
+    padding: 10px 20px; min-height: 40px; border: 1px solid transparent;
+    transition: background .15s ease, border-color .15s ease, transform .15s ease;
+  }
+  .btn:focus-visible, a:focus-visible, summary:focus-visible {
+    outline: 2px solid #fff; outline-offset: 3px; border-radius: 8px;
+  }
+  .btn:focus-visible { border-radius: 999px; }
+  .btn-primary { background: #fff; color: #0a0a0a; }
+  .btn-primary:hover { background: #e5e5e5; }
+  .btn-ghost { background: transparent; color: var(--text); border-color: rgba(255,255,255,.16); }
+  .btn-ghost:hover { border-color: rgba(255,255,255,.35); background: rgba(255,255,255,.04); }
+  .btn-lg { padding: 14px 26px; font-size: 15px; min-height: 48px; }
+
+  /* ---------- Hero ---------- */
+  header.hero { padding: 96px 0 40px; text-align: center; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 10px;
+    border: 1px solid var(--line); border-radius: 999px;
+    padding: 7px 16px 7px 8px; font-size: 13px; color: var(--muted);
+    margin-bottom: 40px; background: rgba(255,255,255,.02);
+  }
+  .pill .tag {
+    background: rgba(120,255,190,.12); color: #7dffbe;
+    font-size: 11px; font-weight: 600; letter-spacing: .08em;
+    padding: 3px 10px; border-radius: 999px;
+  }
+  .pill a { color: var(--text); }
+  .pill a:hover { text-decoration: underline; }
+  h1 {
+    font-size: clamp(52px, 9vw, 96px);
+    font-weight: 600; letter-spacing: -.035em; line-height: 1.02;
+    display: flex; align-items: center; justify-content: center; gap: .18em; flex-wrap: wrap;
+  }
+  h1 .orb { width: .82em; height: .82em; flex: none; transform: translateY(.04em); }
+  .hero-sub {
+    max-width: 620px; margin: 28px auto 0; font-size: 19px; color: var(--muted);
+    line-height: 1.6; letter-spacing: -.01em;
+  }
+  .hero-cta { display: flex; gap: 12px; justify-content: center; margin-top: 36px; flex-wrap: wrap; }
+
+  /* ---------- Product mock ---------- */
+  .mock-stage { padding: 56px 0 8px; }
+  /* Claude Desktop's warm charcoal palette — intentionally distinct from the
+     page's neutral dark so the window reads as "the Claude app". */
+  .app-window {
+    --cl-bg: #262624; --cl-side: #1f1e1c; --cl-line: rgba(255,255,255,.07);
+    --cl-user: #33312d; --cl-accent: #d97757;
+    background: var(--cl-bg); border: 1px solid var(--line); border-radius: 20px;
+    overflow: hidden; max-width: 940px; margin: 0 auto;
+    box-shadow: 0 40px 120px rgba(0,0,0,.5);
+    display: grid; grid-template-columns: 250px 1fr;
+    text-align: left;
+  }
+  .cl-star { color: var(--cl-accent); }
+  .titlebar {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 8px;
+    padding: 13px 16px; border-bottom: 1px solid var(--cl-line);
+  }
+  .titlebar .app-name { display: flex; align-items: center; gap: 7px; margin-left: 8px; font-size: 13px; color: #d4d4d4; font-weight: 500; }
+  .dot { width: 11px; height: 11px; border-radius: 50%; background: #333; }
+  .dot.r { background: #ff5f57; } .dot.y { background: #febc2e; } .dot.g { background: #28c840; }
+  .titlebar span { margin-left: 8px; font-size: 12.5px; color: var(--faint); }
+  .sidebar { background: var(--cl-side); border-right: 1px solid var(--cl-line); padding: 14px 10px; display: flex; flex-direction: column; gap: 4px; }
+  .side-label { font-size: 11px; font-weight: 600; letter-spacing: .08em; color: var(--faint); padding: 2px 10px 8px; display: flex; align-items: center; gap: 6px; }
+  .side-item {
+    display: flex; gap: 10px; padding: 9px 10px; border-radius: 10px; align-items: flex-start;
+    background: none; border: none; font: inherit; color: inherit; text-align: left;
+    cursor: pointer; width: 100%; min-height: 44px;
+    transition: background .15s ease;
+  }
+  .side-item:hover { background: rgba(255,255,255,.04); }
+  .side-item:focus-visible { outline: 2px solid #fff; outline-offset: -2px; }
+  .side-item.active { background: rgba(255,255,255,.06); }
+  .side-item .ico { font-size: 15px; flex: none; width: 20px; text-align: center; }
+  .side-item .t { font-size: 12.5px; font-weight: 500; line-height: 1.3; }
+  .side-item .s { font-size: 11px; color: var(--faint); margin-top: 2px; }
+  .chat-col { display: flex; flex-direction: column; min-height: 400px; }
+  .chat { padding: 26px 28px 16px; display: flex; flex-direction: column; gap: 16px; flex: 1; }
+  .bubble {
+    max-width: 78%; padding: 12px 16px; border-radius: 18px; font-size: 14px; line-height: 1.55;
+  }
+  .bubble.user { align-self: flex-end; background: var(--cl-user); border-bottom-right-radius: 6px; }
+  .bubble.ai {
+    align-self: flex-start; background: transparent; border: none; padding: 0 44px 0 30px;
+    color: #d9d7d2; position: relative; max-width: 88%;
+  }
+  .bubble.ai::before {
+    content: "✳"; position: absolute; left: 0; top: 0;
+    color: var(--cl-accent); font-size: 17px; line-height: 1.3;
+  }
+  .composer {
+    margin: 0 28px 22px; display: flex; align-items: center; gap: 10px;
+    background: #30302c; border: 1px solid var(--cl-line); border-radius: 14px;
+    padding: 12px 16px; font-size: 13.5px; color: var(--faint);
+  }
+  .composer .plus { width: 20px; height: 20px; border-radius: 50%; border: 1px solid rgba(255,255,255,.2); display: flex; align-items: center; justify-content: center; font-size: 13px; flex: none; }
+  .composer .model { margin-left: auto; font-size: 12px; color: var(--faint); flex: none; }
+  .composer input {
+    flex: 1; min-width: 0; background: none; border: none; font: inherit;
+    color: #e8e6e0; caret-color: var(--cl-accent);
+  }
+  .composer input::placeholder { color: var(--faint); }
+  .composer input:focus { outline: none; }
+  .composer:focus-within { border-color: rgba(255,255,255,.28); }
+  .composer .send {
+    flex: none; width: 28px; height: 28px; border-radius: 50%; border: none;
+    background: var(--cl-accent); color: #1a1a18; font-size: 15px; font-weight: 600;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    transition: opacity .15s ease;
+  }
+  .composer .send:hover { opacity: .85; }
+  .composer .send:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+  .chat { overflow-y: auto; max-height: 430px; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.15) transparent; }
+  .bubble .cite {
+    margin-top: 10px; padding: 10px 12px; background: rgba(255,255,255,.04);
+    border: 1px solid var(--line); border-radius: 12px; font-size: 12.5px; color: var(--muted);
+    display: flex; gap: 10px; align-items: center;
+  }
+  .bubble .cite .fav { flex: none; width: 26px; height: 26px; border-radius: 7px; background: var(--card-2); display: flex; align-items: center; justify-content: center; font-size: 13px; }
+  .typing { display: inline-flex; gap: 4px; align-items: center; color: var(--faint); font-size: 13px; }
+  @media (prefers-reduced-motion: no-preference) {
+    .chat .bubble, .chat .typing { animation: bubble-in .38s cubic-bezier(.22,1,.36,1) backwards; }
+    .chat .bubble:nth-child(2), .chat .typing:nth-child(2) { animation-delay: .1s; }
+    .chat .bubble:nth-child(3), .chat .typing:nth-child(3) { animation-delay: .2s; }
+    .chat .bubble:nth-child(4), .chat .typing:nth-child(4) { animation-delay: .3s; }
+    @keyframes bubble-in {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: none; }
+    }
+  }
+
+  /* ---------- Sections ---------- */
+  section { padding: 110px 0 0; }
+  .statement { text-align: center; max-width: 780px; margin: 0 auto; }
+  h2 {
+    font-size: clamp(34px, 5vw, 56px); font-weight: 600;
+    letter-spacing: -.03em; line-height: 1.08;
+  }
+  .statement p { margin: 22px auto 0; max-width: 640px; font-size: 17.5px; color: var(--muted); line-height: 1.65; }
+
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; margin-top: 56px; }
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 36px 36px 0; overflow: hidden; display: flex; flex-direction: column;
+  }
+  .card h3 { font-size: 21px; font-weight: 600; letter-spacing: -.015em; }
+  .card > p { margin-top: 10px; font-size: 15px; color: var(--muted); line-height: 1.6; max-width: 46ch; }
+  .card .visual { margin-top: 28px; flex: 1; display: flex; align-items: flex-end; }
+  .card.wide { grid-column: 1 / -1; flex-direction: row; align-items: center; gap: 48px; padding: 56px; }
+  .card.wide .copy { flex: 1; }
+  .card.wide .copy p { margin-top: 14px; font-size: 16px; color: var(--muted); line-height: 1.65; max-width: 52ch; }
+  .card.wide .art { flex: none; width: 300px; display: flex; justify-content: center; }
+
+  /* capture rows visual */
+  .cap-rows { width: 100%; display: flex; flex-direction: column; gap: 10px; padding-bottom: 36px; }
+  .cap-row {
+    display: flex; align-items: center; gap: 12px; background: var(--card-2);
+    border: 1px solid var(--line); border-radius: 14px; padding: 12px 16px; font-size: 13.5px;
+  }
+  .cap-row .ico { font-size: 16px; width: 22px; text-align: center; }
+  .cap-row .what { color: #d4d4d4; font-weight: 500; }
+  .cap-row .how { margin-left: auto; color: var(--faint); font-size: 12px; text-align: right; }
+
+  /* chat visual in card */
+  .mini-chat { width: 100%; display: flex; flex-direction: column; gap: 10px; padding-bottom: 36px; }
+  .mini-bubble { padding: 11px 15px; border-radius: 16px; font-size: 13.5px; line-height: 1.5; }
+  .mini-bubble.q { align-self: flex-end; background: #2b2b2b; border-bottom-right-radius: 5px; max-width: 85%; }
+  .mini-bubble.a { align-self: flex-start; border: 1px solid var(--line); color: #d4d4d4; border-bottom-left-radius: 5px; max-width: 90%; }
+
+  /* asset stack visual */
+  .stack { width: 100%; display: flex; flex-direction: column; gap: 10px; padding-bottom: 36px; }
+  .asset {
+    display: flex; gap: 12px; align-items: center; background: var(--card-2);
+    border: 1px solid var(--line); border-radius: 14px; padding: 13px 16px;
+  }
+  .asset .fav { flex: none; width: 34px; height: 34px; border-radius: 9px; background: #262626; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+  .asset .t { font-size: 13.5px; font-weight: 500; line-height: 1.3; }
+  .asset .s { font-size: 11.5px; color: var(--faint); margin-top: 2px; }
+  .asset .badge { margin-left: auto; font-size: 10.5px; letter-spacing: .06em; font-weight: 600; color: var(--faint); border: 1px solid var(--line); padding: 3px 9px; border-radius: 999px; flex: none; }
+
+  /* clients visual */
+  .clients { width: 100%; padding-bottom: 36px; display: flex; flex-direction: column; gap: 14px; align-items: center; }
+  .client-row { display: flex; gap: 10px; width: 100%; }
+  .client {
+    flex: 1; background: var(--card-2); border: 1px solid var(--line); border-radius: 14px;
+    padding: 16px 10px; text-align: center; font-size: 13.5px; font-weight: 500; color: #d4d4d4;
+  }
+  .client small { display: block; font-weight: 400; color: var(--faint); font-size: 11px; margin-top: 3px; }
+  .client .clogo { display: block; width: 22px; height: 22px; margin: 0 auto 10px; opacity: .9; }
+  .pipe { color: var(--faint); font-size: 12px; letter-spacing: .04em; }
+
+  /* privacy bullets */
+  .checks { margin-top: 22px; display: flex; flex-direction: column; gap: 12px; }
+  .check { display: flex; gap: 12px; font-size: 15px; color: #d4d4d4; align-items: baseline; }
+  .check b { font-weight: 600; color: var(--text); }
+  .check::before { content: "—"; color: var(--faint); flex: none; }
+
+  /* terminal */
+  .term {
+    background: #0f0f0f; border: 1px solid var(--line); border-radius: 20px;
+    max-width: 720px; margin: 48px auto 0; overflow: hidden; text-align: left;
+  }
+  .term-head { display: flex; gap: 8px; padding: 13px 16px; border-bottom: 1px solid var(--line); align-items: center; }
+  .term-head span { margin-left: 8px; font-size: 12px; color: var(--faint); }
+  .term pre {
+    padding: 24px 26px; font-family: "SF Mono", ui-monospace, "JetBrains Mono", Menlo, monospace;
+    font-size: 13.5px; line-height: 2; color: #d4d4d4; overflow-x: auto;
+  }
+  .term .c { color: var(--faint); }
+  .term .p { color: #7dffbe; }
+
+  /* FAQ */
+  .faq { max-width: 720px; margin: 56px auto 0; text-align: left; }
+  details { border-bottom: 1px solid var(--line); }
+  details summary {
+    cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: center;
+    padding: 22px 4px; font-size: 16.5px; font-weight: 500; gap: 16px;
+  }
+  details summary::-webkit-details-marker { display: none; }
+  details summary::after { content: "+"; color: var(--faint); font-size: 22px; font-weight: 300; transition: transform .2s ease; flex: none; }
+  details[open] summary::after { transform: rotate(45deg); }
+  details div { padding: 0 4px 24px; color: var(--muted); font-size: 15px; line-height: 1.65; max-width: 60ch; }
+
+  /* closing + footer */
+  .closing { text-align: center; padding-bottom: 40px; }
+  .closing .hero-cta { margin-top: 32px; }
+  footer { border-top: 1px solid var(--line); margin-top: 110px; }
+  .foot-inner {
+    display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;
+    padding: 36px 0; font-size: 13.5px; color: var(--faint);
+  }
+  .foot-inner .links { display: flex; gap: 24px; }
+  .foot-inner a:hover { color: var(--text); }
+
+  /* ---------- Mascot animation ----------
+     Animations target the source shapes inside <defs>; every <use> instance
+     inherits them, so all orbs on the page blink together. */
+  #orb .eye, #orb .eyes, #orb .ring { transform-box: fill-box; transform-origin: 50% 50%; }
+  @media (prefers-reduced-motion: no-preference) {
+    #orb .eye { animation: orb-blink 5.4s infinite; }
+    #orb .eyes { animation: orb-glance 11s ease-in-out infinite; }
+    /* Ping ripples outward: inner ring pulses first, outer follows */
+    #orb .ring-1 { animation: orb-ping 7s ease-in-out infinite; }
+    #orb .ring-2 { animation: orb-ping 7s ease-in-out .45s infinite; }
+    @keyframes orb-ping {
+      0%, 14%, 100% { transform: scale(1); opacity: 1; }
+      6% { transform: scale(1.09); opacity: .55; }
+    }
+    @keyframes orb-blink {
+      0%, 3%, 9%, 100% { transform: scaleY(1); }
+      1.5% { transform: scaleY(0.06); }        /* blink */
+      52%, 58% { transform: scaleY(1); }
+      55% { transform: scaleY(0.06); }         /* second blink, off-beat */
+    }
+    @keyframes orb-glance {
+      0%, 24%, 40%, 100% { transform: translateX(0); }
+      28%, 36% { transform: translateX(-4.5px); }  /* look left, hold, return */
+      64%, 70% { transform: translateX(3.5px); }   /* quick look right */
+      74% { transform: translateX(0); }
+    }
+    h1 .orb { animation: orb-float 6s ease-in-out infinite; }
+    @keyframes orb-float {
+      0%, 100% { transform: translateY(.04em) rotate(0deg); }
+      50% { transform: translateY(-.06em) rotate(-2.5deg); }
+    }
+    h1 .orb:hover { animation-play-state: paused; transform: translateY(.04em) scale(1.08) rotate(3deg); }
+    h1 .orb { transition: transform .35s cubic-bezier(.34,1.56,.64,1); }
+  }
+
+  /* reveal animation */
+  .reveal { opacity: 0; transform: translateY(24px); }
+  @media (prefers-reduced-motion: no-preference) {
+    .reveal { transition: opacity .7s cubic-bezier(.22,1,.36,1), transform .7s cubic-bezier(.22,1,.36,1); }
+  }
+  .reveal.in { opacity: 1; transform: none; }
+  @media (prefers-reduced-motion: reduce) {
+    .reveal { opacity: 1; transform: none; }
+    html { scroll-behavior: auto; }
+  }
+
+  /* responsive */
+  @media (max-width: 900px) {
+    .grid { grid-template-columns: 1fr; }
+    .card.wide { flex-direction: column; padding: 40px 32px; gap: 32px; }
+    .card.wide .art { width: 100%; }
+    .app-window { grid-template-columns: 1fr; }
+    .sidebar {
+      flex-direction: row; overflow-x: auto; border-right: none;
+      border-bottom: 1px solid var(--line); padding: 10px;
+      -webkit-overflow-scrolling: touch;
+    }
+    .side-item { width: auto; flex: none; max-width: 210px; }
+    .chat { min-height: 320px; }
+    .nav-links { display: none; }
+    header.hero { padding-top: 64px; }
+    section { padding-top: 80px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ORB mascot symbol: a memory orb — filled circle, crescent "recall" cut, two eyes -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <g id="orb">
+      <!-- Echo rings: memory pinged, answer ripples back -->
+      <circle class="ring ring-2" cx="50" cy="50" r="45" fill="none" stroke="rgba(255,255,255,.16)" stroke-width="2.5"/>
+      <circle class="ring ring-1" cx="50" cy="50" r="33.5" fill="none" stroke="rgba(255,255,255,.38)" stroke-width="3"/>
+      <circle cx="50" cy="50" r="21.5" fill="#fff"/>
+      <g class="eyes">
+        <circle class="eye" cx="43.5" cy="47.5" r="4.3" fill="#0a0a0a"/>
+        <circle class="eye" cx="56.5" cy="47.5" r="4.3" fill="#0a0a0a"/>
+      </g>
+    </g>
+    <!-- Simplified monochrome client marks (compatibility list, not branding) -->
+    <g id="lg-claude" stroke="#e8e6e0" stroke-width="5.5" stroke-linecap="round" fill="none">
+      <path d="M24 7 V17 M24 31 V41 M7 24 H17 M31 24 H41 M12 12 L19 19 M29 29 L36 36 M36 12 L29 19 M19 29 L12 36"/>
+    </g>
+    <g id="lg-cursor" stroke="#e8e6e0" stroke-width="3" stroke-linejoin="round" fill="none">
+      <path d="M24 5 L40.5 14.5 V33.5 L24 43 L7.5 33.5 V14.5 Z"/>
+      <path d="M24 5 V24 M24 24 L40.5 14.5 M24 24 L7.5 33.5"/>
+    </g>
+    <g id="lg-openai" fill="#e8e6e0">
+      <rect x="21" y="3" width="6" height="24" rx="3"/>
+      <rect x="21" y="3" width="6" height="24" rx="3" transform="rotate(60 24 24)"/>
+      <rect x="21" y="3" width="6" height="24" rx="3" transform="rotate(120 24 24)"/>
+      <rect x="21" y="3" width="6" height="24" rx="3" transform="rotate(180 24 24)"/>
+      <rect x="21" y="3" width="6" height="24" rx="3" transform="rotate(240 24 24)"/>
+      <rect x="21" y="3" width="6" height="24" rx="3" transform="rotate(300 24 24)"/>
+    </g>
+    <g id="lg-phone" stroke="#e8e6e0" stroke-width="3" fill="none" stroke-linecap="round">
+      <rect x="13" y="4" width="22" height="40" rx="5"/>
+      <path d="M20 37 H28"/>
+    </g>
+  </defs>
+</svg>
+
+<nav id="nav" aria-label="Main">
+  <div class="wrap nav-inner">
+    <a class="brand" href="#" aria-label="Memex home">
+      <svg width="22" height="22" viewBox="0 0 100 100" aria-hidden="true"><use href="#orb"/></svg>
+      Memex
+    </a>
+    <div class="nav-links">
+      <a href="#memory">Memory</a>
+      <a href="#features">Features</a>
+      <a href="#privacy">Privacy</a>
+      <a href="#install">Install</a>
+      <a href="#faq">FAQ</a>
+    </div>
+    <div class="nav-cta">
+      <a class="btn btn-ghost" href="https://github.com/arnavbee/memex">GitHub</a>
+      <a class="btn btn-primary" href="#install">Download for macOS</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero wrap">
+  <div class="pill reveal">
+    <span class="tag">OPEN SOURCE</span>
+    <span>Memex is here&nbsp;·&nbsp;<a href="https://github.com/arnavbee/memex">Read the code&nbsp;↗</a></span>
+  </div>
+  <h1 class="reveal">Meet
+    <svg class="orb" viewBox="0 0 100 100" role="img" aria-label="Memex orb mascot"><use href="#orb"/></svg>
+    Memex</h1>
+  <p class="hero-sub reveal">A private memory engine for your Mac. It remembers what you read, copy, save, and screenshot — and hands that context to any AI you talk to. No cloud. No subscription. Yours.</p>
+  <div class="hero-cta reveal">
+    <a class="btn btn-primary btn-lg" href="#install"> Download for macOS</a>
+    <a class="btn btn-ghost btn-lg" href="https://github.com/arnavbee/memex">Star on GitHub</a>
+  </div>
+</header>
+
+<div class="mock-stage wrap reveal">
+  <div class="app-window" aria-label="Claude Desktop with Memex connected — click a vault memory to see its recall conversation">
+    <div class="titlebar">
+      <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+      <span class="app-name"><span class="cl-star" aria-hidden="true">✳</span>Claude</span>
+      <span style="margin-left:auto; font-size:12px; color:var(--faint);">Memex connected ·</span>
+      <svg width="13" height="13" viewBox="0 0 100 100" aria-hidden="true" style="opacity:.8"><use href="#orb"/></svg>
+    </div>
+    <div class="sidebar" role="tablist" aria-label="Vault memories">
+      <div class="side-label"><svg width="12" height="12" viewBox="0 0 100 100" aria-hidden="true"><use href="#orb"/></svg> MEMEX VAULT</div>
+      <button class="side-item active" role="tab" aria-selected="true" data-chat="article"><span class="ico">🌐</span><div><div class="t">How to Do Great Work</div><div class="s">Read · 9:09 AM</div></div></button>
+      <button class="side-item" role="tab" aria-selected="false" data-chat="screenshot"><span class="ico">📸</span><div><div class="t">Screenshot — pricing table</div><div class="s">OCR'd · 8:56 AM</div></div></button>
+      <button class="side-item" role="tab" aria-selected="false" data-chat="video"><span class="ico">▶</span><div><div class="t">Karpathy — LLM intro</div><div class="s">Transcript · Yesterday</div></div></button>
+      <button class="side-item" role="tab" aria-selected="false" data-chat="pdf"><span class="ico">📄</span><div><div class="t">python-interviews.pdf</div><div class="s">Parsed · Yesterday</div></div></button>
+      <button class="side-item" role="tab" aria-selected="false" data-chat="clip"><span class="ico">📋</span><div><div class="t">github.com/alirezadir/AIML…</div><div class="s">Copied · Tuesday</div></div></button>
+      <button class="side-item" role="tab" aria-selected="false" data-chat="note"><span class="ico">📝</span><div><div class="t">Startup ideas — August</div><div class="s">Apple Note · Monday</div></div></button>
+    </div>
+    <div class="chat-col">
+      <div class="chat" id="chat-pane" role="tabpanel">
+        <div class="bubble user">what was that essay about doing great work I read last week?</div>
+        <div class="bubble ai">Found it in your vault — <b>"How to Do Great Work"</b> by Paul Graham. You read it Tuesday morning. The core argument: pick something you have a natural aptitude for and an obsessive interest in, then work on your own projects at the frontier.
+          <div class="cite"><span class="fav">🌐</span><span>How to Do Great Work · paulgraham.com · visited Aug 11, 9:09 AM</span></div>
+        </div>
+        <div class="bubble user">summarize the part about curiosity</div>
+        <div class="typing">Memex · searching your vault…</div>
+      </div>
+      <form class="composer" id="composer" autocomplete="off">
+        <span class="plus" aria-hidden="true">+</span>
+        <input id="composer-input" type="text" placeholder="Reply to Claude — try “what did I copy on tuesday?”"
+               aria-label="Message Claude" maxlength="200">
+        <span class="model" aria-hidden="true">Claude Sonnet 4.5</span>
+        <button type="submit" class="send" aria-label="Send message">↑</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<section id="memory">
+  <div class="wrap statement reveal">
+    <h2>Remembers everything.<br>Shares nothing.</h2>
+    <p>Every AI conversation starts with amnesia — your assistant knows nothing about the forty articles you read, the PDFs you saved, the links you copied. Memex runs quietly in the background, indexes it all into a local database, and serves it to every AI you use. Your memory, on tap.</p>
+  </div>
+</section>
+
+<section id="features">
+  <div class="wrap">
+    <div class="grid">
+      <div class="card reveal">
+        <h3>Captures where you work</h3>
+        <p>No filing, no tagging, no "save to Memex" button. If you copied it, read it, downloaded it, or screenshotted it — it's in the vault.</p>
+        <div class="visual">
+          <div class="cap-rows">
+            <div class="cap-row"><span class="ico">📋</span><span class="what">Clipboard</span><span class="how">links become transcripts &amp; articles</span></div>
+            <div class="cap-row"><span class="ico">📸</span><span class="what">Screenshots</span><span class="how">OCR'd on-device</span></div>
+            <div class="cap-row"><span class="ico">📄</span><span class="what">Downloads</span><span class="how">PDFs parsed on arrival</span></div>
+            <div class="cap-row"><span class="ico">🌐</span><span class="what">Browser history</span><span class="how">Safari · Chrome · Brave · Arc</span></div>
+            <div class="cap-row"><span class="ico">📝</span><span class="what">Apple Notes</span><span class="how">synced automatically</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="card reveal">
+        <h3>Ask like you'd ask a friend</h3>
+        <p>Vague is fine. Full-text search with real ranking means "that tweet about databases" finds the tweet — in milliseconds, fully offline.</p>
+        <div class="visual">
+          <div class="mini-chat">
+            <div class="mini-bubble q">that pdf about python interviews?</div>
+            <div class="mini-bubble a">📄 <b>100 Python Interview Questions.pdf</b> — downloaded yesterday. Want the section on generators?</div>
+            <div class="mini-bubble q">what did I copy this morning?</div>
+            <div class="mini-bubble a">3 items — a GitHub repo on ML interviews, a YouTube link (transcript saved), and a code snippet.</div>
+          </div>
+        </div>
+      </div>
+      <div class="card reveal">
+        <h3>Every AI. One memory.</h3>
+        <p>Claude Desktop and Cursor connect over MCP. ChatGPT and your phone connect over your own tunnel. One vault feeds them all — no lock-in, ever.</p>
+        <div class="visual">
+          <div class="clients">
+            <div class="client-row">
+              <div class="client"><svg class="clogo" viewBox="0 0 48 48" aria-hidden="true"><use href="#lg-claude"/></svg>Claude<small>MCP</small></div>
+              <div class="client"><svg class="clogo" viewBox="0 0 48 48" aria-hidden="true"><use href="#lg-cursor"/></svg>Cursor<small>MCP</small></div>
+              <div class="client"><svg class="clogo" viewBox="0 0 48 48" aria-hidden="true"><use href="#lg-openai"/></svg>ChatGPT<small>Actions</small></div>
+              <div class="client"><svg class="clogo" viewBox="0 0 48 48" aria-hidden="true"><use href="#lg-phone"/></svg>Phone<small>HTTPS</small></div>
+            </div>
+            <div class="pipe">▲ &nbsp;one local vault · SQLite · ~/.omnicontext&nbsp; ▲</div>
+          </div>
+        </div>
+      </div>
+      <div class="card reveal">
+        <h3>Rich capture, not bookmarks</h3>
+        <p>Copy a YouTube link and the transcript is indexed before you switch tabs. Articles are archived in full — they survive link rot and paywalls-added-later.</p>
+        <div class="visual">
+          <div class="stack">
+            <div class="asset"><span class="fav">▶</span><div><div class="t">Intro to LLMs — Karpathy</div><div class="s">42 min · full transcript indexed</div></div><span class="badge">YOUTUBE</span></div>
+            <div class="asset"><span class="fav">🐦</span><div><div class="t">"Postgres is all you need…"</div><div class="s">thread text captured</div></div><span class="badge">TWEET</span></div>
+            <div class="asset"><span class="fav">🌐</span><div><div class="t">How to Do Great Work</div><div class="s">full article archived · 11k words</div></div><span class="badge">ARTICLE</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card wide reveal" id="privacy">
+        <div class="copy">
+          <h2 style="font-size: clamp(28px,4vw,44px);">Private by architecture,<br>not by promise</h2>
+          <div class="checks">
+            <div class="check"><span><b>Zero cloud.</b> Your data lives in one SQLite file in your home directory. Period.</span></div>
+            <div class="check"><span><b>Zero third-party calls.</b> OCR runs on Apple's on-device Vision framework. Search is local. Verify with the network tab.</span></div>
+            <div class="check"><span><b>Zero accounts.</b> No signup, no telemetry, no "anonymized usage data."</span></div>
+            <div class="check"><span><b>A forget button that works.</b> Tell your AI to forget something and it's deleted from disk. Not soft-deleted. Gone.</span></div>
+            <div class="check"><span><b>Auditable in an afternoon.</b> ~2,000 lines of MIT-licensed TypeScript.</span></div>
+          </div>
+        </div>
+        <div class="art" aria-hidden="true">
+          <svg width="240" height="240" viewBox="0 0 100 100"><use href="#orb"/></svg>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="install">
+  <div class="wrap statement reveal">
+    <h2>Sixty seconds to<br>a smarter AI</h2>
+    <p>Clone, build, install the daemon. Add one block to your Claude Desktop config and ask: <em>"what did I copy today?"</em></p>
+  </div>
+  <div class="wrap">
+    <div class="term reveal">
+      <div class="term-head">
+        <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+        <span>terminal</span>
+      </div>
+      <pre><span class="c"># get it</span>
+<span class="p">$</span> git clone https://github.com/arnavbee/memex &amp;&amp; cd memex
+<span class="p">$</span> npm install &amp;&amp; npm run build
+
+<span class="c"># run it forever — starts at login, restarts on crash</span>
+<span class="p">$</span> npm run install-daemon</pre>
+    </div>
+  </div>
+</section>
+
+<section id="faq">
+  <div class="wrap statement reveal">
+    <h2>Questions, answered</h2>
+  </div>
+  <div class="wrap faq reveal">
+    <details>
+      <summary>Does this send my data anywhere?</summary>
+      <div>No. There is no server to send it to. The optional Cloudflare tunnel exists only so your own phone and your own ChatGPT account can reach your own Mac — behind a bearer token you set.</div>
+    </details>
+    <details>
+      <summary>What about passwords and sensitive stuff?</summary>
+      <div>The vault is local and browsable, and anything can be deleted instantly — including by just asking your AI to forget it. Password-manager exclusions are on the roadmap as shipped defaults. Private/incognito browsing is never captured.</div>
+    </details>
+    <details>
+      <summary>Will it slow down my Mac?</summary>
+      <div>It's a small Node process that polls your clipboard and watches two folders. You will not notice it.</div>
+    </details>
+    <details>
+      <summary>Mac only?</summary>
+      <div>Yes, for now — capture is deeply macOS-native (Vision OCR, AppleScript, launchd). The vault itself is portable SQLite you can take anywhere.</div>
+    </details>
+    <details>
+      <summary>Why not embeddings and vector search?</summary>
+      <div>Personal recall queries are specific — "that PDF about Python interviews" — and BM25 full-text ranking nails those in milliseconds with zero dependencies, zero GPU, zero API calls. If fuzzy semantic recall ever proves necessary, the architecture leaves room for it. Locally, of course.</div>
+    </details>
+    <details>
+      <summary>Is this affiliated with any AI company?</summary>
+      <div>No. It's independent and open source. That's rather the point — the labs are racing to own your memory. You could just keep it.</div>
+    </details>
+  </div>
+</section>
+
+<section class="closing">
+  <div class="wrap statement reveal">
+    <h2>The best AI is the<br>one that knows you</h2>
+    <div class="hero-cta">
+      <a class="btn btn-primary btn-lg" href="#install"> Download for macOS</a>
+      <a class="btn btn-ghost btn-lg" href="https://github.com/arnavbee/memex">View source</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap foot-inner">
+    <span class="brand" style="font-size:14px; color: var(--faint);">
+      <svg width="16" height="16" viewBox="0 0 100 100" aria-hidden="true"><use href="#orb"/></svg>
+      Memex — free, open source, yours.
+    </span>
+    <div class="links">
+      <a href="https://github.com/arnavbee/memex">GitHub</a>
+      <a href="https://github.com/arnavbee/memex#readme">Docs</a>
+      <a href="https://github.com/arnavbee/memex/blob/main/LICENSE">MIT License</a>
+    </div>
+  </div>
+</footer>
+
+<script>
+  // Hero mock: clicking a vault memory swaps in that conversation
+  const CHATS = {
+    article: [
+      ['user', 'what was that essay about doing great work I read last week?'],
+      ['ai', 'Found it in your vault — <b>"How to Do Great Work"</b> by Paul Graham. You read it Tuesday morning. The core argument: pick something you have a natural aptitude for and an obsessive interest in, then work on your own projects at the frontier.',
+        ['🌐', 'How to Do Great Work · paulgraham.com · visited Aug 11, 9:09 AM']],
+      ['user', 'summarize the part about curiosity'],
+      ['typing', 'Memex · searching your vault…']
+    ],
+    screenshot: [
+      ['user', 'what were the prices on that screenshot I took this morning?'],
+      ['ai', 'From the pricing table you screenshotted at 8:56 — <b>Starter $29/mo</b>, <b>Team $79/mo</b>, <b>Enterprise custom</b>. The Team tier included SSO and audit logs; Starter didn’t.',
+        ['📸', 'Screenshot 2026-08-17 at 8.56.12 AM · OCR’d on-device']],
+      ['user', 'which tier had the API limit?'],
+      ['typing', 'Memex · reading the screenshot…']
+    ],
+    video: [
+      ['user', 'did that karpathy video cover fine-tuning?'],
+      ['ai', 'Yes — around the <b>52-minute mark</b> of "Intro to Large Language Models." He frames fine-tuning as swapping a base model’s "internet documents" objective for curated Q&amp;A examples, and mentions it typically needs ~100k quality conversations.',
+        ['▶', 'Intro to LLMs — Karpathy · 1h02m · full transcript indexed']],
+      ['user', 'pull the exact quote'],
+      ['typing', 'Memex · searching the transcript…']
+    ],
+    pdf: [
+      ['user', 'quiz me from that python interview pdf'],
+      ['ai', 'From <b>100 Python Interview Questions.pdf</b> (downloaded yesterday): <br><br>Q: What’s the difference between a generator and a list comprehension, and when does the generator win?',
+        ['📄', '100 Python Interview Questions.pdf · 48 pages · parsed on arrival']],
+      ['user', 'lazy evaluation — generators win on memory for big sequences'],
+      ['ai', 'Correct. Next one: how does Python’s GIL affect multithreaded CPU-bound code?']
+    ],
+    clip: [
+      ['user', 'send me that github repo I copied on tuesday'],
+      ['ai', 'You copied <b>github.com/alirezadir/AIMLInterviews</b> Tuesday at 8:56 AM — a guide for machine learning and AI technical interviews. Want me to summarize its study roadmap?',
+        ['📋', 'Clipboard · Tuesday 8:56 AM · link archived automatically']],
+      ['user', 'yes, the ML system design section'],
+      ['typing', 'Memex · reading the archived page…']
+    ],
+    note: [
+      ['user', 'what were those startup ideas I wrote down monday?'],
+      ['ai', 'From your Apple Note <b>"Startup ideas — August"</b>: <br>1. Local-first AI memory for teams<br>2. Screenshot-to-invoice expense tracker<br>3. Hackathon project matchmaker<br><br>You starred the first one.',
+        ['📝', 'Startup ideas — August · Apple Notes · synced Monday 11:12 PM']],
+      ['user', 'flesh out the starred one'],
+      ['typing', 'Memex · pulling related saves…']
+    ]
+  };
+
+  const pane = document.getElementById('chat-pane');
+  function renderChat(key) {
+    pane.innerHTML = '';
+    for (const [kind, text, cite] of CHATS[key]) {
+      const el = document.createElement('div');
+      if (kind === 'typing') {
+        el.className = 'typing';
+        el.textContent = text;
+      } else {
+        el.className = 'bubble ' + kind;
+        el.innerHTML = text;
+        if (cite) {
+          const c = document.createElement('div');
+          c.className = 'cite';
+          c.innerHTML = '<span class="fav">' + cite[0] + '</span><span>' + cite[1] + '</span>';
+          el.appendChild(c);
+        }
+      }
+      pane.appendChild(el);
+    }
+  }
+  document.querySelectorAll('.side-item').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.side-item').forEach(b => {
+        b.classList.toggle('active', b === btn);
+        b.setAttribute('aria-selected', String(b === btn));
+      });
+      renderChat(btn.dataset.chat);
+    });
+  });
+
+  // Live composer: match the question to a vault memory and answer from it
+  const MATCHERS = [
+    ['article',    /essay|great work|paul ?graham|article|read.*(week|tuesday)|focus|curiosity/i],
+    ['screenshot', /price|pricing|screenshot|tier|table|\$|sso/i],
+    ['video',      /karpathy|video|youtube|llm|fine.?tun|transcript|watch/i],
+    ['pdf',        /python|pdf|interview|quiz|generator|gil/i],
+    ['clip',       /github|repo|copied|copy|clipboard|tuesday|link/i],
+    ['note',       /note|startup|idea|monday|wrote/i],
+  ];
+  const FALLBACKS = [
+    'Searched the vault — nothing matches that. This demo only holds <b>six memories</b> (the sidebar on the left). The real Memex indexes everything you read, copy, save, and screenshot. <b>git clone</b> it and ask again.',
+    'No hits for that in this demo vault. On your Mac, Memex would have already indexed it — it watches your clipboard, screenshots, downloads, notes, and browser history. Try asking about one of the six memories in the sidebar.',
+  ];
+  let fallbackIdx = 0;
+
+  function appendBubble(kind, html, cite) {
+    const el = document.createElement('div');
+    el.className = 'bubble ' + kind;
+    if (kind === 'user') {
+      el.textContent = html; // user text goes in verbatim, never as HTML
+    } else {
+      el.innerHTML = html;
+      if (cite) {
+        const c = document.createElement('div');
+        c.className = 'cite';
+        c.innerHTML = '<span class="fav">' + cite[0] + '</span><span>' + cite[1] + '</span>';
+        el.appendChild(c);
+      }
+    }
+    pane.appendChild(el);
+    pane.scrollTop = pane.scrollHeight;
+    return el;
+  }
+
+  const form = document.getElementById('composer');
+  const input = document.getElementById('composer-input');
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const q = input.value.trim();
+    if (!q) return;
+    input.value = '';
+    pane.querySelectorAll('.typing').forEach(t => t.remove());
+    appendBubble('user', q);
+
+    const typing = document.createElement('div');
+    typing.className = 'typing';
+    typing.textContent = 'Memex · searching your vault…';
+    pane.appendChild(typing);
+    pane.scrollTop = pane.scrollHeight;
+
+    const hit = MATCHERS.find(([, re]) => re.test(q));
+    setTimeout(() => {
+      typing.remove();
+      if (hit) {
+        const key = hit[0];
+        document.querySelectorAll('.side-item').forEach(b => {
+          b.classList.toggle('active', b.dataset.chat === key);
+          b.setAttribute('aria-selected', String(b.dataset.chat === key));
+        });
+        const answer = CHATS[key].find(m => m[0] === 'ai');
+        appendBubble('ai', answer[1], answer[2]);
+      } else {
+        appendBubble('ai', FALLBACKS[fallbackIdx++ % FALLBACKS.length]);
+      }
+    }, 900);
+  });
+
+  // Sticky nav border on scroll
+  const nav = document.getElementById('nav');
+  addEventListener('scroll', () => nav.classList.toggle('scrolled', scrollY > 8), { passive: true });
+
+  // Scroll-reveal (no-ops under prefers-reduced-motion because the CSS transition is gated)
+  const io = new IntersectionObserver((entries) => {
+    for (const e of entries) if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
+  }, { threshold: 0.12 });
+  document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+  // Safety net: content must never stay invisible if the observer doesn't fire
+  // (prerender, hidden tab, ancient browser).
+  setTimeout(() => document.querySelectorAll('.reveal:not(.in)').forEach(el => el.classList.add('in')), 2000);
+</script>
+</body>
+</html>
