@@ -3,6 +3,7 @@ import { Database, Asset } from './db.js';
 import { processYoutubeLink, extractVideoId } from './youtube.js';
 import { processTwitterLink, extractTweetId } from './twitter.js';
 import { processWebpageUrl, isArchivableUrl } from './webpage.js';
+import { detectSecret, isBlockedApp, isConcealedClipboard } from './secrets.js';
 
 let lastClipboardText = '';
 
@@ -15,6 +16,28 @@ function getClipboardText(): Promise<string> {
         return;
       }
       resolve(stdout);
+    });
+  });
+}
+
+function getClipboardInfo(): Promise<string> {
+  return new Promise((resolve) => {
+    execFile('osascript', ['-e', 'clipboard info'], { timeout: 3000 }, (error, stdout) => {
+      resolve(error ? '' : stdout);
+    });
+  });
+}
+
+function getFrontmostApp(): Promise<string> {
+  return new Promise((resolve) => {
+    // lsappinfo needs no privacy permissions, unlike System Events
+    execFile('lsappinfo', ['info', '-only', 'name', 'front'], { timeout: 3000 }, (error, stdout) => {
+      if (error) {
+        resolve('');
+        return;
+      }
+      const match = stdout.match(/"LSDisplayName"\s*=\s*"([^"]+)"/);
+      resolve(match ? match[1] : stdout.trim());
     });
   });
 }
@@ -37,6 +60,25 @@ export function startClipboardTracker(db: Database, intervalMs = 1500) {
       
       // Limit clipboard item size to avoid bloating database with massive files
       if (trimmed.length > 50000) {
+        return;
+      }
+
+      // Secret protection, three layers — a credential must never reach the vault:
+      // 1. Password managers mark copies with org.nspasteboard.ConcealedType
+      // 2. Anything copied while a password manager is frontmost is a credential
+      // 3. Content that looks like a key/token/password, wherever it came from
+      const [clipInfo, frontApp] = await Promise.all([getClipboardInfo(), getFrontmostApp()]);
+      if (isConcealedClipboard(clipInfo)) {
+        console.error('[Clipboard] Skipped concealed clipboard content (password manager).');
+        return;
+      }
+      if (frontApp && isBlockedApp(frontApp)) {
+        console.error(`[Clipboard] Skipped copy from ${frontApp} (secret store).`);
+        return;
+      }
+      const secretReason = detectSecret(trimmed);
+      if (secretReason) {
+        console.error(`[Clipboard] Skipped secret-looking content (${secretReason}).`);
         return;
       }
 

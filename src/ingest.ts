@@ -4,6 +4,7 @@ import { Database } from './db.js';
 import { processYoutubeLink, extractVideoId } from './youtube.js';
 import { processTwitterLink, extractTweetId } from './twitter.js';
 import { processWebpageUrl, isArchivableUrl } from './webpage.js';
+import { detectSecret } from './secrets.js';
 import os from 'os';
 
 function getLocalIp(): string {
@@ -129,6 +130,12 @@ export function startIngestServer(db: Database, port = 4322) {
         }
 
         if (!handled) {
+          const secretReason = detectSecret(content);
+          if (secretReason) {
+            console.error(`[Ingest] Rejected secret-looking content (${secretReason}).`);
+            sendJson(res, 200, { ok: false, message: `Not saved: looks like a secret (${secretReason}).` });
+            return;
+          }
           // Plain text — save as clipboard item
           db.addAsset({
             id: `phone-${Date.now()}`,
