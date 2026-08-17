@@ -59,7 +59,7 @@ npm install && npm run build
 
 # Configure your API key
 cp .env.example .env
-# Edit .env and set API_KEY=your-secret-token
+# Edit .env and set OMNICONTEXT_API_KEY (only needed for the HTTP API/tunnel)
 
 # Start the daemon once (foreground)
 npm start
