@@ -20,9 +20,25 @@ Memex fixes that. It's a background daemon that runs on your Mac and passively i
 - **Browser history** — Safari, Chrome, Arc, Brave, and Edge visits (all profiles), synced every 30 minutes with search/auth/localhost noise filtered out
 - **Links from your phone** — shared directly from Android via HTTP Shortcuts → POST to local API
 
-**Secrets never enter the vault.** Copies from password managers (1Password, Bitwarden, KeePass, …) are skipped via app detection and the `org.nspasteboard.ConcealedType` marker, and secret-shaped content — AWS keys, GitHub/Slack/Stripe tokens, JWTs, private key blocks, `PASSWORD=` assignments, generated-password-shaped strings — is filtered before storage.
+### Secret filtering
 
-Clipboard noise is self-cleaning: exact duplicates are collapsed and raw clipboard entries expire after 30 days (configurable via `OMNICONTEXT_CLIPBOARD_MAX_AGE_DAYS` / `OMNICONTEXT_CLIPBOARD_MAX_COUNT`). Rich assets — notes, downloads, screenshots, history — are never pruned.
+Every capture path writes through a single choke point in `db.addAsset`, so the same filter applies to clipboard, screenshots, downloads, notes, history, and archived articles alike.
+
+- **Clipboard and phone ingest** are *rejected outright* when they look like a credential. On top of the content filter, copies made while a password manager is frontmost are skipped, as is anything marked `org.nspasteboard.ConcealedType`.
+- **Long-form content** (OCR'd screenshots, downloaded files, notes, articles) is *redacted in place* — the matched span becomes `[REDACTED: <reason>]` and the rest of the document is kept, since dropping a whole PDF over one stray token would be worse.
+
+Detected: AWS/Google/Stripe/SendGrid/Twilio/npm keys, GitHub/GitLab/Slack tokens, OpenAI and Anthropic keys, JWTs, private key blocks, connection strings with passwords, credentials in URL query strings, `otpauth://` URIs, `PASSWORD=`/`*_KEY=` assignments, `.env`-shaped blocks, and generated-password-shaped strings.
+
+**Known limits — worth reading before you trust it.** These are heuristics, not a guarantee:
+- A screenshot of a credential *rendered as an image* is OCR'd to text and only then filtered, so anything the patterns don't recognise (a handwritten note, a QR code, an unusual key format) survives.
+- Password-manager app detection samples the frontmost app on a 1.5s poll, so it can miss; browser-extension password managers report the browser and are not blocked at all. The content filter is the layer that actually catches most of these.
+- Purely alphabetic passphrases with no digits or symbols are not detected.
+
+If you handle secrets you cannot afford to have indexed, exclude those apps or run without screenshot capture.
+
+### Retention
+
+Clipboard: duplicates collapsed, entries expire after 30 days (`OMNICONTEXT_CLIPBOARD_MAX_AGE_DAYS` / `OMNICONTEXT_CLIPBOARD_MAX_COUNT`). Browser history: 90 days (`OMNICONTEXT_HISTORY_MAX_AGE_DAYS`). Notes, downloads, screenshots, and archived articles are kept indefinitely — remembering them is the point — so the vault grows over time. Check it with `npm run vault:status` and clear it with `npm run vault:purge`.
 
 ---
 
@@ -54,29 +70,45 @@ Two interfaces serve the database simultaneously:
 
 ## Setup
 
-**Requirements:** macOS (capture is macOS-native: Vision OCR, AppleScript, launchd) and **Node.js ≥ 22.5** (Memex uses the built-in `node:sqlite`; on older Node it exits with a clear message).
+**Requirements:**
+- macOS — capture is macOS-native (Vision OCR, AppleScript, launchd)
+- **Node.js ≥ 22.5** — Memex uses the built-in `node:sqlite`; on older Node it exits with a clear message
+- **Xcode Command Line Tools** (`xcode-select --install`) — the screenshot and PDF readers are Swift scripts compiled on demand. Without them, screenshots are still captured but store no text.
+- `cloudflared` (`brew install cloudflared`) — only if you want phone/ChatGPT access
 
 ```bash
 git clone https://github.com/arnavbee/memex
 cd memex
 npm install && npm run build
 
-# Configure your API key
+# Configure your API key — required for the HTTP API/tunnel.
 cp .env.example .env
-# Edit .env and set OMNICONTEXT_API_KEY (only needed for the HTTP API/tunnel)
+openssl rand -hex 32     # paste the result as OMNICONTEXT_API_KEY in .env
+```
 
-# Start the daemon once (foreground)
-npm start
+The HTTP server refuses to start on a placeholder or short key, and listens on **127.0.0.1 only** — it is never exposed to your local network. Reaching it from your phone requires the tunnel below.
 
-# ...or install it as a launchd agent: starts at login, restarts on crash
+Then run it **either** in the foreground **or** as an agent — not both, they fight over port 4322:
+
+```bash
+npm start                 # foreground, ctrl-C to stop
+
+# ...or install as a launchd agent: starts at login, restarts on crash
 npm run install-daemon    # logs land in ~/.omnicontext/daemon.log
-npm run uninstall-daemon  # stop + remove (database untouched)
+npm run uninstall-daemon  # stop + remove (vault untouched)
 
 # Expose to mobile (optional)
 cloudflared tunnel --url localhost:4322
 ```
 
-**Permissions** (System Settings → Privacy & Security): grant the `node` binary **Full Disk Access** for Safari history, and **Automation → Notes** for Apple Notes sync. Chromium browsers (Chrome, Brave, Arc, Edge) work without any of this.
+**Permissions** (System Settings → Privacy & Security):
+- **Full Disk Access** for the `node` binary — Safari history, and reading files under `~/Desktop` / `~/Downloads`
+- **Automation → Notes** — Apple Notes sync
+- Chromium browsers (Chrome, Brave, Arc, Edge) need neither
+
+Under launchd these prompts may not appear, and a denial shows up only as an error in `daemon.log` — if screenshots or notes aren't being captured, check there first. Note that Full Disk Access is granted to a specific `node` binary, so upgrading Node (or switching nvm versions) means granting it again.
+
+**Your data** lives in `~/.omnicontext/` (mode `0700`): `db.sqlite` plus a `media/` folder. Inspect it with `npm run vault:status`, delete it with `npm run vault:purge -- --yes`, or delete a single type with `npm run vault:purge -- --type screenshot --yes`. Uninstalling the daemon deliberately leaves the vault in place.
 
 **Claude Desktop** — add to `~/Library/Application Support/Claude/claude_desktop_config.json`, then restart Claude Desktop:
 ```json

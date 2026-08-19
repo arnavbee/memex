@@ -45,6 +45,13 @@ cat > "$PLIST" <<EOF
 </plist>
 EOF
 
+# The vault and its log are private to this user.
+mkdir -p "$LOG_DIR"
+chmod 700 "$LOG_DIR" 2>/dev/null || true
+touch "$LOG_DIR/daemon.log"
+chmod 600 "$LOG_DIR/daemon.log" 2>/dev/null || true
+[ -f "$PROJECT_DIR/.env" ] && chmod 600 "$PROJECT_DIR/.env" 2>/dev/null || true
+
 # Reload if already installed
 launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
 launchctl bootstrap "gui/$(id -u)" "$PLIST"

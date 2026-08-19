@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { DatabaseSync } from 'node:sqlite';
+import { redactSecrets } from './secrets.js';
 
 export interface Asset {
   id: string;
@@ -54,14 +55,25 @@ export class Database {
 
   constructor(dbPath?: string) {
     if (!dbPath) {
+      // 0700: the vault holds clipboard history, OCR'd screenshots and notes.
+      // It defaulted to 0755, readable by every other account on the machine
+      // and by any backup or sync tool with home-directory access.
       if (!fs.existsSync(DB_DIR)) {
-        fs.mkdirSync(DB_DIR, { recursive: true });
+        fs.mkdirSync(DB_DIR, { recursive: true, mode: 0o700 });
+      } else {
+        try { fs.chmodSync(DB_DIR, 0o700); } catch {}
       }
       dbPath = SQLITE_FILE;
     }
     this.db = new DatabaseSync(dbPath);
     this.db.exec('PRAGMA journal_mode = WAL');
     this.db.exec('PRAGMA busy_timeout = 5000');
+    // The -wal and -shm siblings carry the same content as the database itself.
+    if (dbPath !== ':memory:') {
+      for (const f of [dbPath, `${dbPath}-wal`, `${dbPath}-shm`]) {
+        try { if (fs.existsSync(f)) fs.chmodSync(f, 0o600); } catch {}
+      }
+    }
     this.createSchema();
     if (dbPath !== ':memory:') {
       this.migrateFromLegacyJson(path.join(path.dirname(dbPath), 'db.json'));
@@ -154,6 +166,19 @@ export class Database {
   }
 
   public addAsset(asset: Asset) {
+    // Every capture path lands here — clipboard, screenshot OCR, downloads,
+    // Apple Notes, browser history, archived articles, transcripts. Scrubbing
+    // at this choke point is what makes "secrets don't enter the vault" true
+    // for all of them instead of just the clipboard, and it cannot be bypassed
+    // by a new caller that forgets to filter.
+    const scrubbed = redactSecrets(asset.content || '');
+    if (scrubbed.reasons.length > 0) {
+      console.error(
+        `[Secrets] Redacted ${scrubbed.reasons.length} secret pattern(s) from ${asset.type} asset: ${scrubbed.reasons.join(', ')}`
+      );
+      asset = { ...asset, content: scrubbed.text };
+    }
+
     this.db.exec('BEGIN');
     try {
       if (asset.filePath) {
@@ -259,6 +284,54 @@ export class Database {
     removed += Number(overflow.changes);
 
     return removed;
+  }
+
+  /**
+   * Browser history is the fastest-growing type (every visit, every 30 minutes,
+   * forever) and the least useful once stale. Everything else — notes,
+   * downloads, screenshots, archived articles — is deliberately kept, since
+   * remembering them is the point of the product.
+   */
+  public pruneHistory(maxAgeDays = 90): number {
+    const cutoff = new Date(Date.now() - maxAgeDays * 24 * 60 * 60 * 1000).toISOString();
+    const res = this.db.prepare(
+      "DELETE FROM assets WHERE type = 'history' AND createdAt < ?"
+    ).run(cutoff);
+    return Number(res.changes);
+  }
+
+  /**
+   * Fold the write-ahead log back into the database. Without this the -wal file
+   * grows unbounded whenever a long-lived reader (the standalone MCP server)
+   * keeps a connection open — it had reached 57MB against a 68MB database.
+   */
+  public checkpoint(): void {
+    try {
+      this.db.exec('PRAGMA wal_checkpoint(TRUNCATE)');
+    } catch (e) {
+      console.error('[DB] WAL checkpoint failed:', e);
+    }
+  }
+
+  /** Total on-disk footprint of the vault, for `npm run vault:status`. */
+  public stats(): { total: number; byType: Record<string, number> } {
+    const rows = this.db.prepare('SELECT type, COUNT(*) AS n FROM assets GROUP BY type').all() as any[];
+    const byType: Record<string, number> = {};
+    let total = 0;
+    for (const r of rows) {
+      byType[String(r.type)] = Number(r.n);
+      total += Number(r.n);
+    }
+    return { total, byType };
+  }
+
+  /** Deletes every asset, optionally of a single type. Used by `vault:purge`. */
+  public purge(type?: string): number {
+    const res = type
+      ? this.db.prepare('DELETE FROM assets WHERE type = ?').run(type)
+      : this.db.prepare('DELETE FROM assets').run();
+    this.db.exec('VACUUM');
+    return Number(res.changes);
   }
 
   public search(query: string, limit = 5, type?: string): { asset: Asset; score: number }[] {

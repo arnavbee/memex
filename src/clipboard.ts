@@ -105,7 +105,10 @@ export function startClipboardTracker(db: Database, intervalMs = 1500) {
         );
       }
 
-      console.error(`Clipboard copy detected (${trimmed.substring(0, 30)}...)`);
+      // Log the shape, never the content: daemon.log is a plaintext file that
+      // outlives the vault's own protections and used to hold a running
+      // transcript of everything the user copied.
+      console.error(`Clipboard copy detected (${trimmed.length} chars).`);
 
       const id = `clipboard-${Date.now()}`;
       const asset: Asset = {

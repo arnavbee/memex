@@ -5,3 +5,7 @@ dist/
 db.json
 *.log
 .DS_Store
+
+# stray scratch files (a personal photo was committed here once)
+scratch
+scratch/

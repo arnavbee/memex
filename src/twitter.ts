@@ -168,7 +168,7 @@ export async function processTwitterLink(db: Database, url: string): Promise<boo
       }
     };
     db.addAsset(asset);
-    console.error(`Indexed tweet from @${data.screenName}: ${data.text.substring(0, 30)}... (${data.text.length} chars, ${localMediaPaths.length} media items)`);
+    console.error(`Indexed tweet from @${data.screenName} (${data.text.length} chars, ${localMediaPaths.length} media items)`);
     return true;
   }
 

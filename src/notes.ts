@@ -2,8 +2,11 @@ import { execFile } from 'child_process';
 import path from 'path';
 import fs from 'fs';
 import { Database, Asset } from './db.js';
+import { fileURLToPath } from 'url';
 
-const SCRIPTS_DIR = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../scripts');
+// fileURLToPath, not .pathname: the raw pathname keeps percent-encoding, so a
+// clone under a path with a space resolved to a directory that doesn't exist.
+const SCRIPTS_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../scripts');
 const SYNC_SCRIPT = path.join(SCRIPTS_DIR, 'sync_notes.applescript');
 
 function stripHtml(html: string): string {

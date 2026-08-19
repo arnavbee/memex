@@ -13,7 +13,9 @@
     "dev": "tsc -w",
     "test": "tsc && node --test 'dist/**/*.test.js'",
     "install-daemon": "bash scripts/install-daemon.sh",
-    "uninstall-daemon": "bash scripts/uninstall-daemon.sh"
+    "uninstall-daemon": "bash scripts/uninstall-daemon.sh",
+    "vault:status": "node dist/vault.js status",
+    "vault:purge": "node dist/vault.js purge"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",
