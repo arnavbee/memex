@@ -7,8 +7,8 @@
   },
   "servers": [
     {
-      "url": "https://your-vault.ngrok-free.app",
-      "description": "Exposed ngrok tunnel URL mapping to localhost:4322"
+      "url": "https://your-tunnel.trycloudflare.com",
+      "description": "Your Cloudflare tunnel URL (cloudflared tunnel --url localhost:4322). Replace with the hostname cloudflared prints."
     }
   ],
   "paths": {
@@ -29,7 +29,9 @@
                     "description": "The URL, text, caption, or tool description to save."
                   }
                 },
-                "required": ["content"]
+                "required": [
+                  "content"
+                ]
               }
             }
           }
@@ -42,8 +44,12 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "ok": { "type": "boolean" },
-                    "message": { "type": "string" }
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
                   }
                 }
               }
@@ -82,7 +88,9 @@
                     "description": "Maximum number of search results to return."
                   }
                 },
-                "required": ["query"]
+                "required": [
+                  "query"
+                ]
               }
             }
           }
@@ -95,26 +103,50 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "ok": { "type": "boolean" },
+                    "ok": {
+                      "type": "boolean"
+                    },
                     "results": {
                       "type": "array",
                       "items": {
                         "type": "object",
                         "properties": {
-                          "score": { "type": "number" },
+                          "score": {
+                            "type": "number"
+                          },
                           "asset": {
                             "type": "object",
                             "properties": {
-                              "id": { "type": "string" },
-                              "type": { "type": "string", "enum": ["screenshot", "note", "clipboard", "download"] },
-                              "content": { "type": "string" },
-                              "summary": { "type": "string" },
+                              "id": {
+                                "type": "string"
+                              },
+                              "type": {
+                                "type": "string",
+                                "enum": [
+                                  "screenshot",
+                                  "note",
+                                  "clipboard",
+                                  "download"
+                                ]
+                              },
+                              "content": {
+                                "type": "string"
+                              },
+                              "summary": {
+                                "type": "string"
+                              },
                               "metadata": {
                                 "type": "object",
                                 "properties": {
-                                  "title": { "type": "string" },
-                                  "createdAt": { "type": "string" },
-                                  "sourceUrl": { "type": "string" }
+                                  "title": {
+                                    "type": "string"
+                                  },
+                                  "createdAt": {
+                                    "type": "string"
+                                  },
+                                  "sourceUrl": {
+                                    "type": "string"
+                                  }
                                 }
                               }
                             }
@@ -161,7 +193,13 @@
             "schema": {
               "type": "string",
               "default": "all",
-              "enum": ["all", "screenshot", "note", "clipboard", "download"]
+              "enum": [
+                "all",
+                "screenshot",
+                "note",
+                "clipboard",
+                "download"
+              ]
             },
             "description": "Filter by asset type."
           }
@@ -174,22 +212,38 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "ok": { "type": "boolean" },
+                    "ok": {
+                      "type": "boolean"
+                    },
                     "assets": {
                       "type": "array",
                       "items": {
                         "type": "object",
                         "properties": {
-                          "id": { "type": "string" },
-                          "type": { "type": "string" },
-                          "content": { "type": "string" },
-                          "summary": { "type": "string" },
+                          "id": {
+                            "type": "string"
+                          },
+                          "type": {
+                            "type": "string"
+                          },
+                          "content": {
+                            "type": "string"
+                          },
+                          "summary": {
+                            "type": "string"
+                          },
                           "metadata": {
                             "type": "object",
                             "properties": {
-                              "title": { "type": "string" },
-                              "createdAt": { "type": "string" },
-                              "sourceUrl": { "type": "string" }
+                              "title": {
+                                "type": "string"
+                              },
+                              "createdAt": {
+                                "type": "string"
+                              },
+                              "sourceUrl": {
+                                "type": "string"
+                              }
                             }
                           }
                         }

@@ -4,12 +4,15 @@ import fs from 'fs';
 import { execFile } from 'child_process';
 import { Database, Asset } from './db.js';
 import { performOCR, performDescription } from './ocr.js';
+import { fileURLToPath } from 'url';
 
 const HOME = process.env.HOME || '';
 const DESKTOP_DIR = path.join(HOME, 'Desktop');
 const DOWNLOADS_DIR = path.join(HOME, 'Downloads');
 
-const SCRIPTS_DIR = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../scripts');
+// fileURLToPath, not .pathname: the raw pathname keeps percent-encoding, so a
+// clone under a path with a space resolved to a directory that doesn't exist.
+const SCRIPTS_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../scripts');
 const PDF_SWIFT = path.join(SCRIPTS_DIR, 'pdf2text.swift');
 
 function extractPdfText(pdfPath: string): Promise<string> {

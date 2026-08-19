@@ -1,9 +1,12 @@
 import { execFile } from 'child_process';
 import path from 'path';
 import fs from 'fs';
+import { fileURLToPath } from 'url';
 
 const PROJECT_ROOT = path.resolve(process.env.HOME || '', '.omnicontext'); // we can also store scripts in the project directory, let's use the local script location.
-const SCRIPTS_DIR = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../scripts');
+// fileURLToPath, not .pathname: the raw pathname keeps percent-encoding, so a
+// clone under a path with a space resolved to a directory that doesn't exist.
+const SCRIPTS_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../scripts');
 const OCR_BIN = path.join(SCRIPTS_DIR, 'ocr');
 const OCR_SWIFT = path.join(SCRIPTS_DIR, 'ocr.swift');
 

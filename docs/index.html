@@ -581,7 +581,7 @@
     </details>
     <details>
       <summary>What about passwords and sensitive stuff?</summary>
-      <div>Three layers of protection ship as defaults: copies from password managers (1Password, Bitwarden, KeePass, and friends) are never captured, clipboard content marked confidential by well-behaved apps is skipped, and anything that looks like a key, token, or password — AWS keys, GitHub PATs, JWTs, connection strings — is filtered before it can be stored. Private/incognito browsing is never captured, and anything in the vault can be deleted instantly by asking your AI to forget it.</div>
+      <div>Every capture path — clipboard, screenshots, downloads, notes, history — runs through the same filter before anything is stored. Copies made while a password manager is frontmost are skipped, as is clipboard content apps mark confidential. Credential-shaped text (AWS/Stripe/OpenAI keys, GitHub PATs, JWTs, connection strings, <code>PASSWORD=</code> lines) is dropped from a clipboard copy outright, and redacted in place inside longer documents so the rest of the file survives. These are heuristics, not a guarantee: a credential rendered as an image and OCR'd, or an unusual key format, can still slip through — the <a href="https://github.com/arnavbee/memex#secret-filtering">README lists the known limits</a>. Private/incognito browsing is never captured, the vault lives in <code>~/.omnicontext</code> readable only by you, and anything in it can be deleted by asking your AI to forget it or by running <code>npm run vault:purge</code>.</div>
     </details>
     <details>
       <summary>Will it slow down my Mac?</summary>

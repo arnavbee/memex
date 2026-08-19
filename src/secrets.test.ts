@@ -1,6 +1,6 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { detectSecret, isBlockedApp, isConcealedClipboard } from './secrets.js';
+import { detectSecret, isBlockedApp, isConcealedClipboard, redactSecrets } from './secrets.js';
 
 describe('detectSecret — must catch', () => {
   // Provider-shaped fixtures are assembled at runtime so GitHub's push
@@ -44,6 +44,55 @@ describe('detectSecret — must NOT catch', () => {
   for (const [name, sample] of negatives) {
     test(name, () => assert.strictEqual(detectSecret(sample), null, `should NOT flag: ${sample.slice(0, 40)}`));
   }
+});
+
+describe('detectSecret — gaps found in review', () => {
+  const cases: [string, string][] = [
+    ['64-char lowercase hex private key', 'a'.repeat(20) + 'b3f19c7d4e2a8091', ],
+    // The old heuristic required a lowercase char, so upper+digit tokens passed.
+    ['uppercase-and-digit token', 'XKCD7' + 'QWERTY2UIOP9ASDFGH' + '4ZXCVBNM'],
+    ['dotted SendGrid-shaped key', ['SG', 'x9Kd82mQpLzR4vTn', 'aB3dE5gH7jK9mN1pQ3sT5vX7zA9c'].join('.')],
+    ['bare vendor key assignment', 'STRIPE_KEY=abc123def456'],
+    ['multi-line env block', 'DATABASE_URL=postgres://localhost/db\nSTRIPE_KEY=abc123\nDEBUG=false'],
+    ['credential in a URL query string', 'https://api.example.com/v1/data?api_key=8sKd0Lm2Qp4Rt6Vx8Zb1Nc3'],
+    ['otpauth URI', 'otpauth://totp/Example:me@example.com?secret=JBSWY3DPEHPK3PXP'],
+    ['token longer than the old 128 cap', 'Aa1' + 'x7Kq'.repeat(40)],
+  ];
+  for (const [name, sample] of cases) {
+    test(name, () => assert.ok(detectSecret(sample), `should flag: ${sample.slice(0, 40)}`));
+  }
+
+  test('still ignores a git sha and ordinary prose', () => {
+    assert.strictEqual(detectSecret('a3913ad'), null);
+    assert.strictEqual(detectSecret('e05740ac3f7b91d2c4e6a8b0d2f4a6c8e0b2d4f6'), null); // 40-char sha
+    assert.strictEqual(detectSecret('The deploy pipeline runs on every push to main.'), null);
+  });
+});
+
+describe('redactSecrets — long-form content is scrubbed, not dropped', () => {
+  test('keeps the document and removes the secret', () => {
+    const key = ['sk', 'ant', 'api03', 'Xy7Kq2Lm9Pz4Rt6Vx8Zb1Nc3'].join('-');
+    const doc = `Deployment notes\n\nSet the key to ${key} before running.\n\nThen restart the worker.`;
+    const out = redactSecrets(doc);
+
+    assert.ok(!out.text.includes(key), 'secret must not survive');
+    assert.ok(out.text.includes('Deployment notes'), 'surrounding prose must survive');
+    assert.ok(out.text.includes('Then restart the worker.'), 'trailing prose must survive');
+    assert.ok(out.reasons.length > 0);
+  });
+
+  test('replaces every occurrence, not just the first', () => {
+    const a = ['AKIA', 'ABCDEFGHIJKLMNOP'].join('');
+    const b = ['AKIA', 'QRSTUVWXYZ123456'].join('');
+    const out = redactSecrets(`first ${a} and second ${b} done`);
+    assert.ok(!out.text.includes(a) && !out.text.includes(b), 'both must be redacted');
+  });
+
+  test('leaves clean prose untouched', () => {
+    const clean = '# Notes\n\nThe article argues that context is the moat, not the model.';
+    assert.strictEqual(redactSecrets(clean).text, clean);
+    assert.strictEqual(redactSecrets(clean).reasons.length, 0);
+  });
 });
 
 describe('app blocklist and concealed clipboard', () => {

@@ -1,4 +1,6 @@
 import dotenv from 'dotenv';
+import fs from 'fs';
+import path from 'path';
 import { Database } from './db.js';
 import { startWatcher } from './watcher.js';
 import { startClipboardTracker } from './clipboard.js';
@@ -10,6 +12,29 @@ import { processWebpageUrl } from './webpage.js';
 import { syncBrowserHistory } from './browser.js';
 
 dotenv.config();
+
+const DATA_DIR = path.join(process.env.HOME || '', '.omnicontext');
+const LOG_FILE = path.join(DATA_DIR, 'daemon.log');
+const MAX_LOG_BYTES = 5 * 1024 * 1024;
+
+/**
+ * launchd appends to daemon.log forever. Roll it once at startup so it can't
+ * grow without bound, and keep it owner-only — it records the daemon's activity
+ * on the user's machine.
+ */
+function rotateLogIfLarge(): void {
+  try {
+    if (!fs.existsSync(LOG_FILE)) return;
+    fs.chmodSync(LOG_FILE, 0o600);
+    if (fs.statSync(LOG_FILE).size > MAX_LOG_BYTES) {
+      fs.renameSync(LOG_FILE, `${LOG_FILE}.1`);
+      fs.chmodSync(`${LOG_FILE}.1`, 0o600);
+      console.error('[Daemon] Rotated daemon.log (previous log kept as daemon.log.1).');
+    }
+  } catch {
+    // Logging must never take the daemon down.
+  }
+}
 
 async function retroactiveUrlArchive(db: Database) {
   console.error('Checking for unarchived URLs in database...');
@@ -28,17 +53,18 @@ async function retroactiveUrlArchive(db: Database) {
     const url = asset.content.trim();
     const isArchived = assets.some(a => a.type === 'download' && a.metadata.sourceUrl === url);
     if (!isArchived) {
-      console.error(`Retroactively archiving: ${url}`);
+      console.error(`Retroactively archiving: ${(() => { try { return new URL(url).hostname; } catch { return "(url)"; } })()}`);
       try {
         await processWebpageUrl(db, url);
       } catch (err: any) {
-        console.error(`Failed to retroactively archive ${url}:`, err.message);
+        console.error(`Failed to retroactively archive a URL:`, err.message);
       }
     }
   }
 }
 
 async function main() {
+  rotateLogIfLarge();
   console.error('Starting OmniContext background services...');
   
   // 1. Initialize Database
@@ -81,9 +107,10 @@ async function main() {
     syncBrowserHistory(db).catch(err => console.error('Browser history sync failed:', err));
   }, THIRTY_MINUTES);
 
-  // 11. Prune clipboard noise (duplicates, stale entries) at startup and daily
+  // 11. Prune noise and keep the on-disk footprint bounded: at startup, then daily.
   const maxAgeDays = Number(process.env.OMNICONTEXT_CLIPBOARD_MAX_AGE_DAYS) || 30;
   const maxCount = Number(process.env.OMNICONTEXT_CLIPBOARD_MAX_COUNT) || 2000;
+  const historyMaxAgeDays = Number(process.env.OMNICONTEXT_HISTORY_MAX_AGE_DAYS) || 90;
   const runPrune = () => {
     try {
       const removed = db.pruneClipboard(maxAgeDays, maxCount);
@@ -91,6 +118,15 @@ async function main() {
     } catch (err) {
       console.error('Clipboard prune failed:', err);
     }
+    try {
+      const removed = db.pruneHistory(historyMaxAgeDays);
+      if (removed > 0) console.error(`History prune: removed ${removed} visits older than ${historyMaxAgeDays} days.`);
+    } catch (err) {
+      console.error('History prune failed:', err);
+    }
+    // Fold the WAL back in; it had grown to 57MB alongside a 68MB database
+    // because the standalone MCP server holds a read connection open.
+    db.checkpoint();
   };
   runPrune();
   setInterval(runPrune, 24 * 60 * 60 * 1000);
