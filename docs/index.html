@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Memex — Your AI finally knows what you know</title>
-<link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="50" fill="%230a0a0a"/><circle cx="50" cy="50" r="44" fill="none" stroke="rgba(255,255,255,.28)" stroke-width="4"/><circle cx="50" cy="50" r="33" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="4.5"/><circle cx="50" cy="50" r="21" fill="white"/><circle cx="43.5" cy="47.5" r="4.4" fill="%230a0a0a"/><circle cx="56.5" cy="47.5" r="4.4" fill="%230a0a0a"/></svg>'>
+<link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="%230a0a0a"/><path d="M24 50 C24 28 36 16 50 16 C64 16 76 28 76 50 V56 H24 Z" fill="white"/><path d="M31 56 C27 68 22 74 16 80 M40 57 C36 70 32 78 29 86 M50 57 C50 73 50 81 50 89 M60 57 C64 70 68 78 71 86 M69 56 C73 68 78 74 84 80" fill="none" stroke="white" stroke-width="7" stroke-linecap="round"/><path d="M35 42 H46 M54 42 H65" stroke="%230a0a0a" stroke-width="5" stroke-linecap="round"/></svg>'>
 <meta name="description" content="A private memory engine for your Mac. Memex remembers what you read, copy, and save — and hands that context to any AI. No cloud. No subscription.">
 <style>
   :root {
@@ -16,7 +16,7 @@
     --muted: #a3a3a3;
     --faint: #737373;
     --radius: 28px;
-    --accent: #f5f5f5;
+    --accent: #d9954b;
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html { scroll-behavior: smooth; }
@@ -90,9 +90,9 @@
   h1 {
     font-size: clamp(52px, 9vw, 96px);
     font-weight: 600; letter-spacing: -.035em; line-height: 1.02;
-    display: flex; align-items: center; justify-content: center; gap: .18em; flex-wrap: wrap;
   }
-  h1 .orb { width: .82em; height: .82em; flex: none; transform: translateY(.04em); }
+  /* The mark stands in for the full stop, so it rides the last line's baseline */
+  h1 .mk { width: .72em; height: .72em; display: inline-block; vertical-align: -.13em; margin-left: .015em; }
   .hero-sub {
     max-width: 620px; margin: 28px auto 0; font-size: 19px; color: var(--muted);
     line-height: 1.6; letter-spacing: -.01em;
@@ -131,7 +131,7 @@
   }
   .side-item:hover { background: rgba(255,255,255,.04); }
   .side-item:focus-visible { outline: 2px solid #fff; outline-offset: -2px; }
-  .side-item.active { background: rgba(255,255,255,.06); }
+  .side-item.active { background: rgba(255,255,255,.06); box-shadow: inset 2px 0 0 var(--accent); }
   .side-item .ico { font-size: 15px; flex: none; width: 20px; text-align: center; }
   .side-item .t { font-size: 12.5px; font-weight: 500; line-height: 1.3; }
   .side-item .s { font-size: 11px; color: var(--faint); margin-top: 2px; }
@@ -268,7 +268,7 @@
     font-size: 13.5px; line-height: 2; color: #d4d4d4; overflow-x: auto;
   }
   .term .c { color: var(--faint); }
-  .term .p { color: #7dffbe; }
+  .term .p { color: var(--accent); }
 
   /* FAQ */
   .faq { max-width: 720px; margin: 56px auto 0; text-align: left; }
@@ -293,40 +293,74 @@
   .foot-inner .links { display: flex; gap: 24px; }
   .foot-inner a:hover { color: var(--text); }
 
-  /* ---------- Mascot animation ----------
+  /* ---------- Mark animation ----------
      Animations target the source shapes inside <defs>; every <use> instance
-     inherits them, so all orbs on the page blink together. */
-  #orb .eye, #orb .eyes, #orb .ring { transform-box: fill-box; transform-origin: 50% 50%; }
+     inherits them, so every octopus on the page moves in step. */
+  #mark .arm, #mark .tip, #mark .mantle { transform-box: view-box; }
+  #mark .mantle { transform-origin: 50px 56px; }
+  #mark .eyes, #mark .lids { transform-box: fill-box; transform-origin: 50% 50%; }
   @media (prefers-reduced-motion: no-preference) {
-    #orb .eye { animation: orb-blink 5.4s infinite; }
-    #orb .eyes { animation: orb-glance 11s ease-in-out infinite; }
-    /* Ping ripples outward: inner ring pulses first, outer follows */
-    #orb .ring-1 { animation: orb-ping 7s ease-in-out infinite; }
-    #orb .ring-2 { animation: orb-ping 7s ease-in-out .45s infinite; }
-    @keyframes orb-ping {
-      0%, 14%, 100% { transform: scale(1); opacity: 1; }
-      6% { transform: scale(1.09); opacity: .55; }
+    /* Arms: the shoulder leads, the tip follows half a beat later and swings
+       roughly three times as far. Offsets stop them moving as one. */
+    #mark .arm { animation: arm-sway 5.2s ease-in-out infinite; }
+    #mark .tip { animation: arm-sway-tip 5.2s ease-in-out -.55s infinite; }
+    #mark .a2 { animation-delay: -.40s; }  #mark .t2 { animation-delay: -.95s; }
+    #mark .a3 { animation-delay: -.80s; }  #mark .t3 { animation-delay: -1.35s; }
+    #mark .a4 { animation-delay: -1.20s; } #mark .t4 { animation-delay: -1.75s; }
+    #mark .a5 { animation-delay: -1.60s; } #mark .t5 { animation-delay: -2.15s; }
+    @keyframes arm-sway     { 0%, 100% { transform: rotate(-4deg); }  50% { transform: rotate(4deg); } }
+    @keyframes arm-sway-tip { 0%, 100% { transform: rotate(-11deg); } 50% { transform: rotate(11deg); } }
+
+    /* The mantle breathes, pivoting where the arms meet it */
+    #mark .mantle { animation: mantle-breathe 4.8s ease-in-out infinite; }
+    @keyframes mantle-breathe {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.04, 1.055); }
     }
-    @keyframes orb-blink {
+
+    /* Double blink, then a glance left and a quicker one right */
+    #mark .lids { animation: mark-blink 5.4s infinite; }
+    @keyframes mark-blink {
       0%, 3%, 9%, 100% { transform: scaleY(1); }
-      1.5% { transform: scaleY(0.06); }        /* blink */
+      1.5% { transform: scaleY(0.08); }
       52%, 58% { transform: scaleY(1); }
-      55% { transform: scaleY(0.06); }         /* second blink, off-beat */
+      55% { transform: scaleY(0.08); }
     }
-    @keyframes orb-glance {
+    #mark .eyes { animation: mark-glance 11s ease-in-out infinite; }
+    @keyframes mark-glance {
       0%, 24%, 40%, 100% { transform: translateX(0); }
-      28%, 36% { transform: translateX(-4.5px); }  /* look left, hold, return */
-      64%, 70% { transform: translateX(3.5px); }   /* quick look right */
+      28%, 36% { transform: translateX(-4%); }
+      64%, 70% { transform: translateX(3%); }
       74% { transform: translateX(0); }
     }
-    h1 .orb { animation: orb-float 6s ease-in-out infinite; }
-    @keyframes orb-float {
-      0%, 100% { transform: translateY(.04em) rotate(0deg); }
-      50% { transform: translateY(-.06em) rotate(-2.5deg); }
-    }
-    h1 .orb:hover { animation-play-state: paused; transform: translateY(.04em) scale(1.08) rotate(3deg); }
-    h1 .orb { transition: transform .35s cubic-bezier(.34,1.56,.64,1); }
   }
+
+  /* ---------- Loading overlay ----------
+     Full-bleed black with the mark on it. Dismissed by JS on window load, with
+     two independent safety nets so it can never strand a visitor: a CSS
+     fail-safe at 2.2s, and a hard timeout in the script. */
+  .preload {
+    position: fixed; inset: 0; z-index: 999;
+    background: var(--bg);
+    display: grid; place-items: center;
+    opacity: 1; visibility: visible;
+    transition: opacity .5s ease, visibility .5s ease;
+    animation: preload-failsafe 0s linear 2.2s forwards;
+  }
+  .preload.done { opacity: 0; visibility: hidden; pointer-events: none; }
+  @keyframes preload-failsafe { to { opacity: 0; visibility: hidden; pointer-events: none; } }
+  .preload-in { position: relative; display: grid; place-items: center; }
+  .preload-in svg { position: relative; z-index: 1; }
+  @media (prefers-reduced-motion: no-preference) {
+    /* Just the octopus, rising and settling */
+    .preload-in svg { animation: preload-bob 1.15s ease-in-out infinite; }
+    @keyframes preload-bob {
+      0%, 100% { transform: translateY(7px); }
+      50%      { transform: translateY(-7px); }
+    }
+  }
+  /* Nothing to watch, so do not hold the page up at all */
+  @media (prefers-reduced-motion: reduce) { .preload { display: none; } }
 
   /* reveal animation */
   .reveal { opacity: 0; transform: translateY(24px); }
@@ -360,34 +394,72 @@
 </head>
 <body>
 
-<!-- ORB mascot symbol: a memory orb — filled circle, crescent "recall" cut, two eyes -->
-<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<!-- Memex mark: an octopus. Cuttlefish-style W pupils; arms sway with the tips
+     lagging the shoulders; the mantle breathes. -->
+<svg width="0" height="0" viewBox="0 0 100 100" style="position:absolute" aria-hidden="true">
   <defs>
-    <g id="orb">
-      <!-- Echo rings: memory pinged, answer ripples back -->
-      <circle class="ring ring-2" cx="50" cy="50" r="45" fill="none" stroke="rgba(255,255,255,.16)" stroke-width="2.5"/>
-      <circle class="ring ring-1" cx="50" cy="50" r="33.5" fill="none" stroke="rgba(255,255,255,.38)" stroke-width="3"/>
-      <circle cx="50" cy="50" r="21.5" fill="#fff"/>
-      <g class="eyes">
-        <circle class="eye" cx="43.5" cy="47.5" r="4.3" fill="#0a0a0a"/>
-        <circle class="eye" cx="56.5" cy="47.5" r="4.3" fill="#0a0a0a"/>
+    <g id="mark">
+      <!-- Arms are two segments each, hinged at shoulder and elbow, so the
+           tips can lag behind and the sway reads as a limb, not a stick. -->
+      <g class="arm a1" style="transform-origin:31px 56px">
+        <path d="M31 56 Q28.9 65.8 25 70" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round"/>
+        <g class="tip t1" style="transform-origin:25px 70px">
+          <path d="M25 70 Q21.9 77.0 16 80" fill="none" stroke="#fff" stroke-width="6.4" stroke-linecap="round"/>
+        </g>
+      </g>
+      <g class="arm a2" style="transform-origin:40px 57px">
+        <path d="M40 57 Q38.2 67.5 35 72" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round"/>
+        <g class="tip t2" style="transform-origin:35px 72px">
+          <path d="M35 72 Q32.9 81.8 29 86" fill="none" stroke="#fff" stroke-width="6.4" stroke-linecap="round"/>
+        </g>
+      </g>
+      <g class="arm a3" style="transform-origin:50px 57px">
+        <path d="M50 57 Q50.0 68.2 50 73" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round"/>
+        <g class="tip t3" style="transform-origin:50px 73px">
+          <path d="M50 73 Q50.0 84.2 50 89" fill="none" stroke="#fff" stroke-width="6.4" stroke-linecap="round"/>
+        </g>
+      </g>
+      <g class="arm a4" style="transform-origin:60px 57px">
+        <path d="M60 57 Q61.8 67.5 65 72" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round"/>
+        <g class="tip t4" style="transform-origin:65px 72px">
+          <path d="M65 72 Q67.1 81.8 71 86" fill="none" stroke="#fff" stroke-width="6.4" stroke-linecap="round"/>
+        </g>
+      </g>
+      <g class="arm a5" style="transform-origin:69px 56px">
+        <path d="M69 56 Q71.1 65.8 75 70" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round"/>
+        <g class="tip t5" style="transform-origin:75px 70px">
+          <path d="M75 70 Q78.2 77.0 84 80" fill="none" stroke="#fff" stroke-width="6.4" stroke-linecap="round"/>
+        </g>
+      </g>
+      <g class="mantle">
+        <path d="M24 50 C24 28 36 16 50 16 C64 16 76 28 76 50 V56 H24 Z" fill="#fff"/>
+        <g class="eyes"><g class="lids">
+          <path d="M33 38 L36.5 45 L40 38 L43.5 45 L47 38" fill="none" stroke="#0a0a0a"
+                stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M53 38 L56.5 45 L60 38 L63.5 45 L67 38" fill="none" stroke="#0a0a0a"
+                stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+        </g></g>
       </g>
     </g>
-    <!-- Simplified monochrome client marks (compatibility list, not branding) -->
-    <g id="lg-claude" stroke="#e8e6e0" stroke-width="5.5" stroke-linecap="round" fill="none">
-      <path d="M24 7 V17 M24 31 V41 M7 24 H17 M31 24 H41 M12 12 L19 19 M29 29 L36 36 M36 12 L29 19 M19 29 L12 36"/>
+    <!-- Client marks for the compatibility row. Nominative use only.
+         Replace with each vendor's official SVG when you have the assets. -->
+    <g id="lg-claude" stroke="#e8e6e0" stroke-width="3.4" stroke-linecap="round" fill="none">
+      <path d="M24.0 19.0 L24.0 4.5 M26.7 19.8 L34.5 7.6 M28.5 21.9 L41.7 15.9 M28.9 24.7 L43.3 26.8 M27.8 27.3 L38.7 36.8 M25.4 28.8 L29.5 42.7 M22.6 28.8 L18.5 42.7 M20.2 27.3 L9.3 36.8 M19.1 24.7 L4.7 26.8 M19.5 21.9 L6.3 15.9 M21.3 19.8 L13.5 7.6"/>
     </g>
-    <g id="lg-cursor" stroke="#e8e6e0" stroke-width="3" stroke-linejoin="round" fill="none">
-      <path d="M24 5 L40.5 14.5 V33.5 L24 43 L7.5 33.5 V14.5 Z"/>
-      <path d="M24 5 V24 M24 24 L40.5 14.5 M24 24 L7.5 33.5"/>
+    <g id="lg-cursor">
+      <path d="M24 4 L41 14 V34 L24 44 L7 34 V14 Z" fill="#e8e6e0" opacity=".22"/>
+      <path d="M24 4 L41 14 L24 24 L7 14 Z" fill="#e8e6e0" opacity=".85"/>
+      <path d="M24 24 L41 14 V34 L24 44 Z" fill="#e8e6e0" opacity=".55"/>
+      <path d="M24 4 L41 14 V34 L24 44 L7 34 V14 Z M24 24 L41 14 M24 24 L7 14 M24 24 V44"
+            fill="none" stroke="#e8e6e0" stroke-width="1.6" stroke-linejoin="round"/>
     </g>
-    <g id="lg-openai" fill="#e8e6e0">
-      <rect x="21" y="3" width="6" height="24" rx="3"/>
-      <rect x="21" y="3" width="6" height="24" rx="3" transform="rotate(60 24 24)"/>
-      <rect x="21" y="3" width="6" height="24" rx="3" transform="rotate(120 24 24)"/>
-      <rect x="21" y="3" width="6" height="24" rx="3" transform="rotate(180 24 24)"/>
-      <rect x="21" y="3" width="6" height="24" rx="3" transform="rotate(240 24 24)"/>
-      <rect x="21" y="3" width="6" height="24" rx="3" transform="rotate(300 24 24)"/>
+    <g id="lg-openai" fill="none" stroke="#e8e6e0" stroke-width="1.5" opacity=".95">
+      <path d="M24 8 C31 8 36 13 36 19 C36 25 31 29 24 29 C17 29 12 25 12 19 C12 13 17 8 24 8 Z" transform="rotate(0 24 24)"/>
+      <path d="M24 8 C31 8 36 13 36 19 C36 25 31 29 24 29 C17 29 12 25 12 19 C12 13 17 8 24 8 Z" transform="rotate(60 24 24)"/>
+      <path d="M24 8 C31 8 36 13 36 19 C36 25 31 29 24 29 C17 29 12 25 12 19 C12 13 17 8 24 8 Z" transform="rotate(120 24 24)"/>
+      <path d="M24 8 C31 8 36 13 36 19 C36 25 31 29 24 29 C17 29 12 25 12 19 C12 13 17 8 24 8 Z" transform="rotate(180 24 24)"/>
+      <path d="M24 8 C31 8 36 13 36 19 C36 25 31 29 24 29 C17 29 12 25 12 19 C12 13 17 8 24 8 Z" transform="rotate(240 24 24)"/>
+      <path d="M24 8 C31 8 36 13 36 19 C36 25 31 29 24 29 C17 29 12 25 12 19 C12 13 17 8 24 8 Z" transform="rotate(300 24 24)"/>
     </g>
     <g id="lg-phone" stroke="#e8e6e0" stroke-width="3" fill="none" stroke-linecap="round">
       <rect x="13" y="4" width="22" height="40" rx="5"/>
@@ -396,10 +468,16 @@
   </defs>
 </svg>
 
+<div class="preload" id="preload" role="status" aria-label="Loading Memex">
+  <div class="preload-in">
+    <svg width="118" height="118" viewBox="0 0 100 100" aria-hidden="true"><use href="#mark"/></svg>
+  </div>
+</div>
+
 <nav id="nav" aria-label="Main">
   <div class="wrap nav-inner">
     <a class="brand" href="#" aria-label="Memex home">
-      <svg width="22" height="22" viewBox="0 0 100 100" aria-hidden="true"><use href="#orb"/></svg>
+      <svg width="22" height="22" viewBox="0 0 100 100" aria-hidden="true"><use href="#mark"/></svg>
       Memex
     </a>
     <div class="nav-links">
@@ -411,22 +489,21 @@
     </div>
     <div class="nav-cta">
       <a class="btn btn-ghost" href="https://github.com/arnavbee/memex">GitHub</a>
-      <a class="btn btn-primary" href="#install">Download for macOS</a>
+      <a class="btn btn-primary" href="#install">Install</a>
     </div>
   </div>
 </nav>
 
 <header class="hero wrap">
   <div class="pill reveal">
-    <span class="tag">OPEN SOURCE</span>
-    <span>Memex is here&nbsp;·&nbsp;<a href="https://github.com/arnavbee/memex">Read the code&nbsp;↗</a></span>
+    <span class="tag">MIT</span>
+    <span>~2,000 lines of TypeScript&nbsp;·&nbsp;<a href="https://github.com/arnavbee/memex">Read all of it&nbsp;↗</a></span>
   </div>
-  <h1 class="reveal">Meet
-    <svg class="orb" viewBox="0 0 100 100" role="img" aria-label="Memex orb mascot"><use href="#orb"/></svg>
-    Memex</h1>
+  <h1 class="reveal">Nothing leaves.<br>Nothing is forgotten<svg class="mk" viewBox="0 0 100 100"
+      aria-hidden="true"><use href="#mark"/></svg></h1>
   <p class="hero-sub reveal">A private memory engine for your Mac. It remembers what you read, copy, save, and screenshot — and hands that context to any AI you talk to. No cloud. No subscription. Yours.</p>
   <div class="hero-cta reveal">
-    <a class="btn btn-primary btn-lg" href="#install"> Download for macOS</a>
+    <a class="btn btn-primary btn-lg" href="#install">Install Memex</a>
     <a class="btn btn-ghost btn-lg" href="https://github.com/arnavbee/memex">Star on GitHub</a>
   </div>
 </header>
@@ -437,10 +514,10 @@
       <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
       <span class="app-name"><span class="cl-star" aria-hidden="true">✳</span>Claude</span>
       <span style="margin-left:auto; font-size:12px; color:var(--faint);">Memex connected ·</span>
-      <svg width="13" height="13" viewBox="0 0 100 100" aria-hidden="true" style="opacity:.8"><use href="#orb"/></svg>
+      <svg width="13" height="13" viewBox="0 0 100 100" aria-hidden="true" style="opacity:.8"><use href="#mark"/></svg>
     </div>
     <div class="sidebar" role="tablist" aria-label="Vault memories">
-      <div class="side-label"><svg width="12" height="12" viewBox="0 0 100 100" aria-hidden="true"><use href="#orb"/></svg> MEMEX VAULT</div>
+      <div class="side-label"><svg width="12" height="12" viewBox="0 0 100 100" aria-hidden="true"><use href="#mark"/></svg> MEMEX VAULT</div>
       <button class="side-item active" role="tab" aria-selected="true" data-chat="article"><span class="ico">🌐</span><div><div class="t">How to Do Great Work</div><div class="s">Read · 9:09 AM</div></div></button>
       <button class="side-item" role="tab" aria-selected="false" data-chat="screenshot"><span class="ico">📸</span><div><div class="t">Screenshot — pricing table</div><div class="s">OCR'd · 8:56 AM</div></div></button>
       <button class="side-item" role="tab" aria-selected="false" data-chat="video"><span class="ico">▶</span><div><div class="t">Karpathy — LLM intro</div><div class="s">Transcript · Yesterday</div></div></button>
@@ -470,14 +547,29 @@
 
 <section id="memory">
   <div class="wrap statement reveal">
-    <h2>Remembers everything.<br>Shares nothing.</h2>
-    <p>Every AI conversation starts with amnesia — your assistant knows nothing about the forty articles you read, the PDFs you saved, the links you copied. Memex runs quietly in the background, indexes it all into a local database, and serves it to every AI you use. Your memory, on tap.</p>
+    <h2>Every conversation starts<br>with amnesia</h2>
+    <p>Your assistant knows nothing about the forty articles you read, the PDFs you saved, the links you copied. Memex runs quietly in the background, indexes it all into a local database, and serves it to every AI you use. Your memory, on tap.</p>
   </div>
 </section>
 
 <section id="features">
   <div class="wrap">
     <div class="grid">
+      <div class="card wide reveal" id="privacy">
+        <div class="copy">
+          <h2 style="font-size: clamp(28px,4vw,44px);">Private by architecture,<br>not by promise</h2>
+          <div class="checks">
+            <div class="check"><span><b>Zero cloud.</b> Your data lives in one SQLite file in your home directory. Period.</span></div>
+            <div class="check"><span><b>Zero third-party calls.</b> OCR runs on Apple's on-device Vision framework. Search is local. Verify with the network tab.</span></div>
+            <div class="check"><span><b>Zero accounts.</b> No signup, no telemetry, no "anonymized usage data."</span></div>
+            <div class="check"><span><b>A forget button that works.</b> Tell your AI to forget something and it's deleted from disk. Not soft-deleted. Gone.</span></div>
+            <div class="check"><span><b>Auditable in an afternoon.</b> ~2,000 lines of MIT-licensed TypeScript.</span></div>
+          </div>
+        </div>
+        <div class="art" aria-hidden="true">
+          <svg width="240" height="240" viewBox="0 0 100 100"><use href="#mark"/></svg>
+        </div>
+      </div>
       <div class="card reveal">
         <h3>Captures where you work</h3>
         <p>No filing, no tagging, no "save to Memex" button. If you copied it, read it, downloaded it, or screenshotted it — it's in the vault.</p>
@@ -530,21 +622,6 @@
         </div>
       </div>
 
-      <div class="card wide reveal" id="privacy">
-        <div class="copy">
-          <h2 style="font-size: clamp(28px,4vw,44px);">Private by architecture,<br>not by promise</h2>
-          <div class="checks">
-            <div class="check"><span><b>Zero cloud.</b> Your data lives in one SQLite file in your home directory. Period.</span></div>
-            <div class="check"><span><b>Zero third-party calls.</b> OCR runs on Apple's on-device Vision framework. Search is local. Verify with the network tab.</span></div>
-            <div class="check"><span><b>Zero accounts.</b> No signup, no telemetry, no "anonymized usage data."</span></div>
-            <div class="check"><span><b>A forget button that works.</b> Tell your AI to forget something and it's deleted from disk. Not soft-deleted. Gone.</span></div>
-            <div class="check"><span><b>Auditable in an afternoon.</b> ~2,000 lines of MIT-licensed TypeScript.</span></div>
-          </div>
-        </div>
-        <div class="art" aria-hidden="true">
-          <svg width="240" height="240" viewBox="0 0 100 100"><use href="#orb"/></svg>
-        </div>
-      </div>
     </div>
   </div>
 </section>
@@ -606,7 +683,7 @@
   <div class="wrap statement reveal">
     <h2>The best AI is the<br>one that knows you</h2>
     <div class="hero-cta">
-      <a class="btn btn-primary btn-lg" href="#install"> Download for macOS</a>
+      <a class="btn btn-primary btn-lg" href="#install">Install Memex</a>
       <a class="btn btn-ghost btn-lg" href="https://github.com/arnavbee/memex">View source</a>
     </div>
   </div>
@@ -615,7 +692,7 @@
 <footer>
   <div class="wrap foot-inner">
     <span class="brand" style="font-size:14px; color: var(--faint);">
-      <svg width="16" height="16" viewBox="0 0 100 100" aria-hidden="true"><use href="#orb"/></svg>
+      <svg width="16" height="16" viewBox="0 0 100 100" aria-hidden="true"><use href="#mark"/></svg>
       Memex — free, open source, yours.
     </span>
     <div class="links">
@@ -770,6 +847,23 @@
       }
     }, 900);
   });
+
+  // Loading overlay: held for a beat so the mark is actually watchable, then
+  // cleared. Hard-capped so a slow or failed load can never strand a visitor.
+  (() => {
+    const veil = document.getElementById('preload');
+    if (!veil) return;
+    const MIN_MS = 1000, HARD_MS = 1600, t0 = performance.now();
+    let cleared = false;
+    const clear = () => {
+      if (cleared) return;
+      cleared = true;
+      veil.classList.add('done');
+      setTimeout(() => veil.remove(), 600);
+    };
+    addEventListener('load', () => setTimeout(clear, Math.max(0, MIN_MS - (performance.now() - t0))));
+    setTimeout(clear, HARD_MS);
+  })();
 
   // Sticky nav border on scroll
   const nav = document.getElementById('nav');
