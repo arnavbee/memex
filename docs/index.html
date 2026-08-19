@@ -629,7 +629,7 @@
 <section id="install">
   <div class="wrap statement reveal">
     <h2>Sixty seconds to<br>a smarter AI</h2>
-    <p>Clone, build, install the daemon. Add one block to your Claude Desktop config and ask: <em>"what did I copy today?"</em></p>
+    <p>One brew command. Add one block to your Claude Desktop config and ask: <em>"what did I copy today?"</em></p>
   </div>
   <div class="wrap">
     <div class="term reveal">
@@ -638,11 +638,12 @@
         <span>terminal</span>
       </div>
       <pre><span class="c"># get it</span>
-<span class="p">$</span> git clone https://github.com/arnavbee/memex &amp;&amp; cd memex
-<span class="p">$</span> npm install &amp;&amp; npm run build
+<span class="p">$</span> brew install arnavbee/memex/memex
 
 <span class="c"># run it forever — starts at login, restarts on crash</span>
-<span class="p">$</span> npm run install-daemon</pre>
+<span class="p">$</span> brew services start memex
+
+<span class="c"># prefer building from source? git clone https://github.com/arnavbee/memex</span></pre>
     </div>
   </div>
 </section>
@@ -658,7 +659,7 @@
     </details>
     <details>
       <summary>What about passwords and sensitive stuff?</summary>
-      <div>Every capture path — clipboard, screenshots, downloads, notes, history — runs through the same filter before anything is stored. Copies made while a password manager is frontmost are skipped, as is clipboard content apps mark confidential. Credential-shaped text (AWS/Stripe/OpenAI keys, GitHub PATs, JWTs, connection strings, <code>PASSWORD=</code> lines) is dropped from a clipboard copy outright, and redacted in place inside longer documents so the rest of the file survives. These are heuristics, not a guarantee: a credential rendered as an image and OCR'd, or an unusual key format, can still slip through — the <a href="https://github.com/arnavbee/memex#secret-filtering">README lists the known limits</a>. Private/incognito browsing is never captured, the vault lives in <code>~/.omnicontext</code> readable only by you, and anything in it can be deleted by asking your AI to forget it or by running <code>npm run vault:purge</code>.</div>
+      <div>Every capture path — clipboard, screenshots, downloads, notes, history — runs through the same filter before anything is stored. Copies made while a password manager is frontmost are skipped, as is clipboard content apps mark confidential. Credential-shaped text (AWS/Stripe/OpenAI keys, GitHub PATs, JWTs, connection strings, <code>PASSWORD=</code> lines) is dropped from a clipboard copy outright, and redacted in place inside longer documents so the rest of the file survives. These are heuristics, not a guarantee: a credential rendered as an image and OCR'd, or an unusual key format, can still slip through — the <a href="https://github.com/arnavbee/memex#secret-filtering">README lists the known limits</a>. Private/incognito browsing is never captured, the vault lives in <code>~/.omnicontext</code> readable only by you, and anything in it can be deleted by asking your AI to forget it or by running <code>memex purge</code>.</div>
     </details>
     <details>
       <summary>Will it slow down my Mac?</summary>
@@ -791,7 +792,7 @@
     ['note',       /note|startup|idea|monday|wrote/i],
   ];
   const FALLBACKS = [
-    'Searched the vault — nothing matches that. This demo only holds <b>six memories</b> (the sidebar on the left). The real Memex indexes everything you read, copy, save, and screenshot. <b>git clone</b> it and ask again.',
+    'Searched the vault — nothing matches that. This demo only holds <b>six memories</b> (the sidebar on the left). The real Memex indexes everything you read, copy, save, and screenshot. <b>brew install</b> it and ask again.',
     'No hits for that in this demo vault. On your Mac, Memex would have already indexed it — it watches your clipboard, screenshots, downloads, notes, and browser history. Try asking about one of the six memories in the sidebar.',
   ];
   let fallbackIdx = 0;
