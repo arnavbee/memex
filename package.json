@@ -1,6 +1,6 @@
 {
   "name": "omnicontext",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Local personal AI context database and MCP server",
   "main": "dist/index.js",
   "type": "module",

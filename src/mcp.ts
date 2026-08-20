@@ -53,7 +53,7 @@ export function startMcpServer(db: Database) {
   const server = new Server(
     {
       name: 'omnicontext-server',
-      version: '1.0.0',
+      version: '1.0.1',
     },
     {
       capabilities: {
