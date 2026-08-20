@@ -5,6 +5,7 @@ import { processYoutubeLink, extractVideoId } from './youtube.js';
 import { processTwitterLink, extractTweetId } from './twitter.js';
 import { processWebpageUrl, isArchivableUrl } from './webpage.js';
 import { detectSecret } from './secrets.js';
+import { USER_ENV_PATH } from './env.js';
 
 const MAX_BODY_BYTES = 1024 * 1024; // 1MB — this endpoint is exposed via a public tunnel
 const MAX_LIMIT = 100;
@@ -17,7 +18,7 @@ const PLACEHOLDER_KEYS = new Set(['change-me', 'changeme', 'secret', 'password',
 
 function validateApiKey(key: string | undefined): string | null {
   if (!key) {
-    return 'OMNICONTEXT_API_KEY is not set. Copy .env.example to .env and set it.';
+    return 'OMNICONTEXT_API_KEY is not set.';
   }
   if (PLACEHOLDER_KEYS.has(key.toLowerCase())) {
     return `OMNICONTEXT_API_KEY is still the placeholder value "${key}".`;
@@ -317,7 +318,10 @@ export function startIngestServer(db: Database, port = 4322) {
   const keyProblem = validateApiKey(process.env.OMNICONTEXT_API_KEY);
   if (keyProblem) {
     console.error(`\n⚠️  HTTP server not started: ${keyProblem}`);
-    console.error('   Generate one with:  openssl rand -hex 32');
+    console.error('   This only affects phone/ChatGPT access over a tunnel.');
+    console.error('   To enable it:');
+    console.error('     mkdir -p ~/.omnicontext');
+    console.error(`     echo "OMNICONTEXT_API_KEY=$(openssl rand -hex 32)" >> ${USER_ENV_PATH}`);
     console.error('   The MCP server and local capture keep running normally.\n');
     return;
   }

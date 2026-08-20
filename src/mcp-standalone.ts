@@ -6,11 +6,11 @@ import { checkNodeVersion } from './preflight.js';
 
 checkNodeVersion();
 
-const [{ default: dotenv }, { Database }, { startMcpServer }] = await Promise.all([
-  import('dotenv'),
+const [{ loadEnv }, { Database }, { startMcpServer }] = await Promise.all([
+  import('./env.js'),
   import('./db.js'),
   import('./mcp.js'),
 ]);
 
-dotenv.config();
+loadEnv();
 startMcpServer(new Database());
