@@ -1,4 +1,3 @@
-import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
 import { Database } from './db.js';
@@ -10,8 +9,9 @@ import { startIngestServer } from './ingest.js';
 import { scanRecentFiles } from './historical.js';
 import { processWebpageUrl } from './webpage.js';
 import { syncBrowserHistory } from './browser.js';
+import { loadEnv } from './env.js';
 
-dotenv.config();
+loadEnv();
 
 const DATA_DIR = path.join(process.env.HOME || '', '.omnicontext');
 const LOG_FILE = path.join(DATA_DIR, 'daemon.log');

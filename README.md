@@ -79,7 +79,7 @@ If you handle secrets you cannot afford to have indexed, exclude those apps or r
 
 ### Retention
 
-Clipboard: duplicates collapsed, entries expire after 30 days (`OMNICONTEXT_CLIPBOARD_MAX_AGE_DAYS` / `OMNICONTEXT_CLIPBOARD_MAX_COUNT`). Browser history: 90 days (`OMNICONTEXT_HISTORY_MAX_AGE_DAYS`). Notes, downloads, screenshots, and archived articles are kept indefinitely — remembering them is the point — so the vault grows over time. Check it with `npm run vault:status` and clear it with `npm run vault:purge`.
+Clipboard: duplicates collapsed, entries expire after 30 days (`OMNICONTEXT_CLIPBOARD_MAX_AGE_DAYS` / `OMNICONTEXT_CLIPBOARD_MAX_COUNT`). Browser history: 90 days (`OMNICONTEXT_HISTORY_MAX_AGE_DAYS`). Notes, downloads, screenshots, and archived articles are kept indefinitely — remembering them is the point — so the vault grows over time. Check it with `memex status` and clear it with `memex purge --yes`.
 
 ---
 
@@ -109,49 +109,115 @@ Two interfaces serve the database simultaneously:
 
 ---
 
-## Setup
+## Install
+
+```bash
+brew install arnavbee/memex/memex
+brew services start memex
+```
+
+That is the whole install. `brew services` registers a launchd agent, so the daemon starts
+at login and restarts if it crashes.
 
 **Requirements:**
-- macOS — capture is macOS-native (Vision OCR, AppleScript, launchd)
-- **Node.js ≥ 22.5** — Memex uses the built-in `node:sqlite`; on older Node it exits with a clear message
-- **Xcode Command Line Tools** (`xcode-select --install`) — the screenshot and PDF readers are Swift scripts compiled on demand. Without them, screenshots are still captured but store no text.
-- `cloudflared` (`brew install cloudflared`) — only if you want phone/ChatGPT access
+- macOS. Capture is macOS-native (Vision OCR, AppleScript, launchd).
+- **Xcode Command Line Tools** (`xcode-select --install`). The screenshot and PDF readers are
+  Swift scripts compiled on demand. Without them screenshots are still captured, but store no text.
+- Node.js 22.5 or newer, which Homebrew installs for you. Memex uses the built-in `node:sqlite`;
+  on older Node it exits with a clear message.
+
+### Connect your AI
+
+Add this to Claude Desktop's `~/Library/Application Support/Claude/claude_desktop_config.json`,
+then restart Claude Desktop:
+
+```json
+{
+  "mcpServers": {
+    "memex": {
+      "command": "/opt/homebrew/opt/memex/bin/memex-mcp"
+    }
+  }
+}
+```
+
+On an Intel Mac the path is `/usr/local/opt/memex/bin/memex-mcp`. Run `brew --prefix memex` if you
+are not sure. The same config works for Cursor and any other MCP client.
+
+### Everyday commands
+
+```bash
+memex status              # what the vault currently holds
+memex purge --yes         # empty it
+memex purge --type screenshot --yes
+brew services stop memex  # pause all capture
+brew services start memex # resume
+```
+
+### Permissions
+
+macOS gates most of what Memex reads. Grant these under System Settings, Privacy & Security:
+
+- **Full Disk Access** for the `node` binary, needed for Safari history and for reading files
+  under `~/Desktop` and `~/Downloads`
+- **Automation, Notes** for Apple Notes sync
+- Chromium browsers (Chrome, Brave, Arc, Edge) need neither
+
+Under launchd these prompts may never appear, and a denial shows up only as an error in
+`~/.omnicontext/daemon.log`. If screenshots or notes are not being captured, read that file first.
+Full Disk Access is granted to a specific `node` binary, so upgrading Node means granting it again.
+
+### Optional: phone and ChatGPT access
+
+Off by default. The HTTP API does not start at all unless you give it a key, and it never listens
+on your local network. To turn it on:
+
+```bash
+mkdir -p ~/.omnicontext
+echo "OMNICONTEXT_API_KEY=$(openssl rand -hex 32)" >> ~/.omnicontext/.env
+brew services restart memex
+
+cloudflared tunnel --url localhost:4322   # brew install cloudflared
+```
+
+Configuration lives at `~/.omnicontext/.env`, beside the vault, because `brew upgrade` replaces
+the installed tree and would destroy anything kept there. `~/.omnicontext/.env.example` is not
+installed; the keys are `OMNICONTEXT_API_KEY`, `OMNICONTEXT_ALLOWED_HOSTS`,
+`OMNICONTEXT_CLIPBOARD_MAX_AGE_DAYS`, `OMNICONTEXT_CLIPBOARD_MAX_COUNT` and
+`OMNICONTEXT_HISTORY_MAX_AGE_DAYS`.
+
+The server refuses to start on a placeholder or on anything shorter than 32 characters, binds
+`127.0.0.1` only, and is reachable from your phone solely through a tunnel you start yourself.
+
+**Your data** lives in `~/.omnicontext/` (mode `0700`): `db.sqlite` plus a `media/` folder.
+Uninstalling deliberately leaves the vault in place. `brew uninstall memex` removes the software;
+`rm -rf ~/.omnicontext` removes the data.
+
+---
+
+## Building from source
+
+Only needed if you want to develop on Memex. A source checkout and a Homebrew install will fight
+over port 4322, so run one or the other, not both.
 
 ```bash
 git clone https://github.com/arnavbee/memex
 cd memex
 npm install && npm run build
+npm test
 
-# Configure your API key — required for the HTTP API/tunnel.
-cp .env.example .env
-openssl rand -hex 32     # paste the result as OMNICONTEXT_API_KEY in .env
-```
+cp .env.example .env      # optional; repo-local .env takes precedence over ~/.omnicontext/.env
 
-The HTTP server refuses to start on a placeholder or short key, and listens on **127.0.0.1 only** — it is never exposed to your local network. Reaching it from your phone requires the tunnel below.
-
-Then run it **either** in the foreground **or** as an agent — not both, they fight over port 4322:
-
-```bash
 npm start                 # foreground, ctrl-C to stop
-
-# ...or install as a launchd agent: starts at login, restarts on crash
-npm run install-daemon    # logs land in ~/.omnicontext/daemon.log
+npm run install-daemon    # or install as a launchd agent
 npm run uninstall-daemon  # stop + remove (vault untouched)
 
-# Expose to mobile (optional)
-cloudflared tunnel --url localhost:4322
+npm run vault:status
+npm run vault:purge -- --yes
 ```
 
-**Permissions** (System Settings → Privacy & Security):
-- **Full Disk Access** for the `node` binary — Safari history, and reading files under `~/Desktop` / `~/Downloads`
-- **Automation → Notes** — Apple Notes sync
-- Chromium browsers (Chrome, Brave, Arc, Edge) need neither
+Point Claude Desktop at `dist/mcp-standalone.js` rather than the installed binary:
 
-Under launchd these prompts may not appear, and a denial shows up only as an error in `daemon.log` — if screenshots or notes aren't being captured, check there first. Note that Full Disk Access is granted to a specific `node` binary, so upgrading Node (or switching nvm versions) means granting it again.
-
-**Your data** lives in `~/.omnicontext/` (mode `0700`): `db.sqlite` plus a `media/` folder. Inspect it with `npm run vault:status`, delete it with `npm run vault:purge -- --yes`, or delete a single type with `npm run vault:purge -- --type screenshot --yes`. Uninstalling the daemon deliberately leaves the vault in place.
-
-**Claude Desktop** — add to `~/Library/Application Support/Claude/claude_desktop_config.json`, then restart Claude Desktop:
 ```json
 {
   "mcpServers": {
@@ -163,7 +229,9 @@ Under launchd these prompts may not appear, and a denial shows up only as an err
 }
 ```
 
-> Use `mcp-standalone.js`, not `index.js` — Claude Desktop only needs the query interface. `index.js` is the full capture daemon; running it twice double-captures your clipboard and fights over port 4322. The same config works for Cursor and any MCP client.
+> Use `mcp-standalone.js`, not `index.js`. Claude Desktop only needs the query interface;
+> `index.js` is the full capture daemon, and running it twice double-captures your clipboard
+> and fights over port 4322.
 
 **ChatGPT Custom Actions** — import `openapi.json` from the repo into your GPT's action schema, pointing the server URL at your Cloudflare tunnel, with `Authorization: Bearer <your OMNICONTEXT_API_KEY>`.
 
