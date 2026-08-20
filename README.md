@@ -7,7 +7,48 @@
 
 Most AI assistants don't know anything about you. Every new conversation starts from zero — they don't know what you've been reading, what links you've saved, what notes you've written, or what files you've downloaded.
 
-Memex fixes that. It's a background daemon that runs on your Mac and passively indexes your digital activity into a local database. That database is then made available to any LLM — Claude on your desktop, ChatGPT on your phone — through standard interfaces. No cloud storage. No third-party servers. Everything stays on your machine.
+Memex fixes that. It's a background daemon that runs on your Mac and passively indexes your digital activity into a local database. That database is then made available to any LLM — Claude on your desktop, ChatGPT on your phone — through standard interfaces. No cloud storage, no accounts, no telemetry. Your vault never leaves your machine unless you deliberately expose it, and the section below spells out exactly what that means.
+
+---
+
+## What leaves your machine
+
+You are about to run a daemon that watches your clipboard, screen, downloads, notes and browser
+history. You should not have to take "it's local-first" on faith, so here is the precise answer.
+
+**Your vault never leaves.** It is a SQLite file at `~/.omnicontext`. Nothing uploads it, syncs it,
+or backs it up. There are no accounts, no analytics, no telemetry, and no crash reporting: grep the
+source for `posthog`, `sentry`, `segment`, `analytics` and you will find nothing, because there is
+nothing there. The only runtime dependencies are an MCP SDK, a readability parser, jsdom, chokidar
+and dotenv.
+
+**Memex does make outbound requests, and you should know when.** They send the URL you copied, not
+your vault:
+
+- Copy any link and it fetches that page to archive a readable copy of it
+- Copy a YouTube link and it calls YouTube's player API and caption endpoint for the transcript
+- Copy an x.com link and it fetches the post and its media
+- On first startup it scans your last 500 clipboard items and archives any links it has not seen yet
+
+The practical consequence: the sites you copy links to will see a request from your IP shortly after
+you copy. If that is not acceptable for a given link, do not copy it while the daemon is running.
+
+**The HTTP API is off by default.** The daemon only starts it if you set `OMNICONTEXT_API_KEY`
+yourself; with no key it refuses to listen and tells you so. When it does run it binds `127.0.0.1`
+only, requires a bearer token compared in constant time, throttles failed auth, and rejects
+unexpected `Host` headers to blunt DNS rebinding. It is reachable from the internet only if you
+personally run `cloudflared`. That is a deliberate, opt-in act, never a default.
+
+**The MCP server is a local stdio process.** Your LLM client spawns it directly. It opens no port.
+
+**What is never captured:** private and incognito browsing, because browsers do not write those
+sessions to the history database Memex reads; clipboard copied while a password manager is
+frontmost; and anything marked `org.nspasteboard.ConcealedType`. Credentials are additionally
+filtered at a single choke point, with honest limits documented under Secret filtering below.
+
+**How to verify any of this yourself:** `memex status` shows exactly what is in the vault,
+`memex purge --yes` empties it, `brew services stop memex` halts all capture, and
+`lsof -iTCP -sTCP:LISTEN -P | grep memex` shows whether anything is listening at all.
 
 ---
 
